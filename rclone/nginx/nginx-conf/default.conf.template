@@ -1,0 +1,99 @@
+# ---- njs 模块：预签名 URL 生成 + 代理鉴权签名 ----
+js_import presign from /etc/nginx/njs/presign.js;
+js_set $s3_proxy_auth presign.proxyAuth;
+
+# ---- CORS 源白名单 ----
+map $http_origin $cors_origin {
+    default                                        '';
+    '~^https?://localhost(:[0-9]+)?$'             $http_origin;
+    '~^https?://127\.0\.0\.1(:[0-9]+)?$'         $http_origin;
+    '~^https://[a-zA-Z0-9-]+\.whitestone\.top$'  $http_origin;
+}
+
+# ==================================================================
+# Rclone S3 代理 + 预签名端点（HTTP，本地开发 / Docker 内网）
+# 功能：
+#   - /presign 生成浏览器直传预签名 URL
+#   - /user-avatar/ 代理到 rclone（含 SigV4 鉴权 + CORS）
+#   - 其他 S3 操作全量代理（MakeBucket / ListBuckets 等）
+# ==================================================================
+server {
+    listen 5001;
+    server_name ${NGINX_SERVER_NAME};
+
+    absolute_redirect off;
+    client_max_body_size 10m;
+
+    # Docker DNS（proxy_pass 含变量时需动态解析主机名）
+    resolver 127.0.0.11 valid=30s ipv6=off;
+
+    # S3 签名凭据（server 级共享，proxyAuth 读取）
+    set $s3_access_key '${S3_ACCESS_KEY}';
+    set $s3_secret_key '${S3_SECRET_KEY}';
+    set $s3_proxy_date '';
+
+    # ---- 预签名 URL 生成端点 ----
+    location = /presign {
+        set $s3_host '${S3_HOST}';
+        set $s3_scheme '${S3_SCHEME}';
+        js_content presign.handle;
+    }
+
+    # ---- Bucket: user-avatar ----
+    location ~ ^/user-avatar/ {
+        # CORS preflight
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' $cors_origin always;
+            add_header 'Access-Control-Allow-Methods' 'GET, PUT, POST, DELETE, OPTIONS' always;
+            add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, X-Amz-Date, X-Amz-Content-Sha256, X-Amz-Security-Token' always;
+            add_header 'Access-Control-Max-Age' 3600 always;
+            return 204;
+        }
+
+        # 剥离 rclone 自带的 CORS 头（避免重复），由 nginx 统一设置
+        proxy_hide_header Access-Control-Allow-Origin;
+        proxy_hide_header Access-Control-Allow-Methods;
+        proxy_hide_header Access-Control-Allow-Headers;
+        proxy_hide_header Access-Control-Expose-Headers;
+
+        add_header 'Access-Control-Allow-Origin' $cors_origin always;
+        add_header 'Access-Control-Allow-Methods' 'GET, PUT, POST, DELETE, OPTIONS' always;
+        add_header 'Access-Control-Expose-Headers' 'ETag, x-amz-request-id' always;
+
+        # SigV4 代理签名（Authorization 必须先于 x-amz-date，确保 proxyAuth 先求值）
+        proxy_set_header Authorization $s3_proxy_auth;
+        proxy_set_header x-amz-date $s3_proxy_date;
+        proxy_set_header x-amz-content-sha256 "UNSIGNED-PAYLOAD";
+
+        proxy_pass http://rclone-avatar:9000$uri;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto http;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+
+    # ---- 其他 S3 操作（MakeBucket / ListBuckets 等）→ 全部代理到 rclone ----
+    location / {
+        proxy_hide_header Access-Control-Allow-Origin;
+        proxy_hide_header Access-Control-Allow-Methods;
+        proxy_hide_header Access-Control-Allow-Headers;
+        proxy_hide_header Access-Control-Expose-Headers;
+
+        # SigV4 代理签名
+        proxy_set_header Authorization $s3_proxy_auth;
+        proxy_set_header x-amz-date $s3_proxy_date;
+        proxy_set_header x-amz-content-sha256 "UNSIGNED-PAYLOAD";
+
+        proxy_pass http://rclone-avatar:9000$uri;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto http;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+}

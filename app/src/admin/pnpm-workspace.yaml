@@ -1,0 +1,3 @@
+packages:
+  - "."
+  - "../../../prism-fusion/src/admin"

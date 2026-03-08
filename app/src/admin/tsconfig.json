@@ -1,0 +1,47 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": false,
+    "strictFunctionTypes": false,
+    "noImplicitThis": true,
+    "jsx": "preserve",
+    "importHelpers": true,
+    "experimentalDecorators": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "allowJs": false,
+    "resolveJsonModule": true,
+    "lib": ["ESNext", "DOM"],
+    "paths": {
+      "@/*": ["../../../prism-fusion/src/admin/src/*"],
+      "@build/*": ["../../../prism-fusion/src/admin/build/*"],
+      "@biz/*": ["src/*"],
+      "prism-fusion-admin": ["../../../prism-fusion/src/admin/src/core/index.ts"],
+      "prism-fusion-admin/plugin": ["../../../prism-fusion/src/admin/src/plugin/index.ts"]
+    },
+    "types": [
+      "node",
+      "vite/client",
+      "element-plus/global",
+      "@pureadmin/table/volar",
+      "unplugin-icons/types/vue",
+      "@pureadmin/descriptions/volar"
+    ]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue",
+    "../../../prism-fusion/src/admin/types/*.d.ts",
+    "../../../prism-fusion/src/admin/env-web.d.ts",
+    "vite.config.ts"
+  ],
+  "exclude": ["dist", "**/*.js", "node_modules"]
+}

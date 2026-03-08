@@ -1,0 +1,16 @@
+# Casdoor 自定义构建 — Docker 忽略文件
+# build context: ./casdoor/
+
+# 前端依赖（构建时重新安装）
+web_prism/node_modules/
+
+# 后端子模块 Git 历史
+casdoor/.git/
+casdoor/web/node_modules/
+
+# 运行时 nginx 配置（仅 docker-compose 挂载用）
+nginx/
+
+# 环境变量
+.env
+.env.example

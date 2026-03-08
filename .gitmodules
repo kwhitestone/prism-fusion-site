@@ -1,0 +1,12 @@
+[submodule "prism-fusion"]
+	path = prism-fusion
+	url = git@github.com:kwhitestone/prism-fusion.git
+	branch = master
+[submodule "casdoor/casdoor"]
+	path = casdoor/casdoor
+	url = git@github.com:kwhitestone-references/casdoor.git
+	branch = whitestone
+[submodule "rclone/rclone"]
+	path = rclone/rclone
+	url = git@github.com:kwhitestone-references/rclone.git
+	branch = whitestone

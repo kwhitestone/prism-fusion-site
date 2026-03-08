@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+
+# Build output
+app/src/admin/dist/
+
+# Server runtime
+app/src/server/log/
+app/src/server/*.db
+app/src/server/__debug_bin*
+*.exe
+
+# Rclone storage data (keep .gitkeep)
+rclone/local-storage/*
+!rclone/local-storage/.gitkeep

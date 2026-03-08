@@ -1,0 +1,31 @@
+{
+  "name": "prism-example-site-admin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "rimraf dist && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "prism-fusion-admin": "workspace:*"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.1",
+    "@vitejs/plugin-vue-jsx": "^5.1.1",
+    "@tailwindcss/vite": "^4.1.16",
+    "rimraf": "^6.0.1",
+    "sass": "^1.93.2",
+    "tailwindcss": "^4.1.16",
+    "typescript": "^5.9.3",
+    "unplugin-icons": "^22.5.0",
+    "vite": "^7.1.12",
+    "vite-svg-loader": "^5.1.0",
+    "vue-tsc": "^3.1.2"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.13.0",
+    "pnpm": ">=9"
+  }
+}

@@ -1,0 +1,56 @@
+# ==================================================
+# Docker 构建忽略文件
+# 仅 prism-fusion-site 主应用构建需要:
+#   app/src/admin/   (前端源码)
+#   app/src/server/  (Go 后端源码)
+#   prism-fusion/    (框架子模块)
+# ==================================================
+
+# ---- Git / VCS ----
+.git/
+.gitignore
+.gitattributes
+.gitmodules
+**/.git/
+
+# ---- Casdoor（子模块源码 + 配置，仅 docker-compose 运行时用）----
+casdoor/
+
+# ---- Rclone（运行时存储 + nginx 配置，仅 docker-compose 运行时用）----
+rclone/
+
+# ---- 环境变量 ----
+.env
+.env.example
+
+# ---- 文档 ----
+README.md
+docs/
+**/*.md
+
+# ---- IDE / 编辑器 ----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ---- Node.js 依赖（构建时重新安装）----
+**/node_modules/
+
+# ---- 前端构建产物（构建时重新生成）----
+app/src/admin/dist/
+
+# ---- Go 运行时文件 ----
+app/src/server/log/
+app/src/server/*.db
+app/src/server/__debug_bin*
+**/*.exe
+
+# ---- Docker 自身 ----
+docker-compose.yaml
+Dockerfile
+
+# ---- 操作系统 ----
+.DS_Store
+Thumbs.db

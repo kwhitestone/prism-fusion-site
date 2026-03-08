@@ -1,0 +1,245 @@
+# Prism Fusion Site 服务编排
+# 使用方式: docker compose up -d
+# 架构: 主应用 + Casdoor (IAM) + Rclone (S3 存储) + Nginx (代理/预签名)
+#
+# 服务拓扑 (Docker 内网):
+#   prism-fusion-site → casdoor:8000 (认证)
+#                     → rclone-nginx:5001 (S3 存储)
+#   casdoor-nginx:8080 → casdoor:8000 (代理) + rclone-nginx:5001 (预签名转发)
+#   rclone-nginx:5001  → rclone-avatar:9000 (SigV4 代理)
+#
+# 宿主机端口:
+#   ${GATEWAY_PORT:-3280}        → 主应用
+#   ${CASDOOR_NGINX_PORT:-5203}  → Casdoor (通过 nginx)
+#   ${RCLONE_NGINX_PORT:-5208}   → Rclone S3 (通过 nginx)
+#   ${CASDOOR_DB_PORT:-3301}     → Casdoor MySQL (调试用)
+
+services:
+  # ============================================================
+  # Prism Fusion Site - 主应用
+  # ============================================================
+  prism-fusion-site:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    container_name: prism-fusion-site
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_PORT:-3280}:3280"
+    environment:
+      GATEWAY_PORT: "${GATEWAY_PORT:-3180}"
+      # Casdoor 认证配置
+      CASDOOR_ENDPOINT: "http://casdoor:8000"
+      CASDOOR_CLIENT_ID: "${CASDOOR_CLIENT_ID}"
+      CASDOOR_CLIENT_SECRET: "${CASDOOR_CLIENT_SECRET}"
+      CASDOOR_ORG: "${CASDOOR_ORG:-prism-fusion}"
+      CASDOOR_APP: "${CASDOOR_APP:-app-prism-fusion}"
+      CASDOOR_EXTERNAL_ENDPOINT: "${CASDOOR_EXTERNAL_ENDPOINT}"
+      CASDOOR_ADMIN_PASSWORD: "${CASDOOR_ADMIN_PASSWORD}"
+      CASDOOR_APP_ADMIN_PASSWORD: "${CASDOOR_APP_ADMIN_PASSWORD}"
+      CASDOOR_QQ_MAIL_SMTP_ACCOUNT: "${CASDOOR_QQ_MAIL_SMTP_ACCOUNT}"
+      CASDOOR_QQ_MAIL_SMTP_SECRET: "${CASDOOR_QQ_MAIL_SMTP_SECRET}"
+      EXTERNAL_OIDC_REDIRECT_URIS: "${EXTERNAL_OIDC_REDIRECT_URIS}"
+      # 数据库配置
+      DB_HOST: "${DB_HOST:-}"
+      DB_PORT: "${DB_PORT:-3306}"
+      DB_NAME: "${DB_NAME:-prism_fusion_site}"
+      DB_USER: "${DB_USER:-root}"
+      DB_PASSWORD: "${DB_PASSWORD:-}"
+      # S3 兼容存储（通过 rclone-nginx 代理）
+      S3_ENDPOINT: "http://rclone-nginx:5001"
+      S3_ACCESS_KEY: "${S3_ACCESS_KEY}"
+      S3_SECRET_KEY: "${S3_SECRET_KEY}"
+      S3_PUBLIC_URL: "${S3_PUBLIC_URL}"
+    depends_on:
+      casdoor:
+        condition: service_healthy
+      rclone-nginx:
+        condition: service_healthy
+    networks:
+      - prism-net
+
+  # ============================================================
+  # Casdoor - 身份认证与单点登录 (IAM / SSO)
+  # 从 casdoor/ 子模块 + web_prism/ 定制前端多阶段构建
+  # ============================================================
+  casdoor:
+    build:
+      context: ./casdoor
+      dockerfile: Dockerfile
+      target: STANDARD
+    container_name: prism-casdoor
+    restart: unless-stopped
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        if [ -n "$$CASDOOR_DB_PASSWORD" ]; then
+          sed -i "s|root:.*@tcp|root:$$CASDOOR_DB_PASSWORD@tcp|" /conf/app.conf
+        fi
+        exec ./server --createDatabase=true
+    depends_on:
+      casdoor-db:
+        condition: service_healthy
+    environment:
+      RUNNING_IN_DOCKER: "true"
+      CASDOOR_DB_PASSWORD: "${CASDOOR_DB_PASSWORD:-casdoor_fusion_123}"
+    volumes:
+      - ./casdoor/casdoor_conf:/conf/
+    networks:
+      - prism-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ============================================================
+  # Casdoor MySQL 数据库
+  # ============================================================
+  casdoor-db:
+    image: mysql:8.0.25
+    platform: linux/amd64
+    container_name: prism-casdoor-db
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CASDOOR_DB_PORT:-3301}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${CASDOOR_DB_PASSWORD:-casdoor_fusion_123}
+    volumes:
+      - casdoor-db-data:/var/lib/mysql
+    networks:
+      prism-net:
+        aliases:
+          - db
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ============================================================
+  # Casdoor Nginx - 预签名鉴权代理
+  # 功能: 校验 Casdoor 会话后转发预签名请求到 Rclone Nginx
+  # ============================================================
+  casdoor-nginx:
+    build: ./casdoor/nginx
+    container_name: prism-casdoor-nginx
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CASDOOR_NGINX_PORT:-5203}:8080"
+    volumes:
+      - ./casdoor/nginx/nginx-conf:/data:ro
+    environment:
+      - NGINX_SERVER_NAME=${CASDOOR_NGINX_SERVER_NAME:-localhost}
+      - STORAGE_PRESIGN_UPSTREAM=${STORAGE_PRESIGN_UPSTREAM:-http://rclone-nginx:5001}
+    command: ["/bin/sh", "/data/start-nginx.sh"]
+    depends_on:
+      - casdoor
+    networks:
+      - prism-net
+
+  # ============================================================
+  # Rclone S3 Serve - 本地磁盘头像存储
+  # 文件存储在 ./rclone/local-storage/ 目录
+  # ============================================================
+  rclone-avatar:
+    image: rclone/rclone:latest
+    container_name: prism-rclone-avatar
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+    command: >
+      serve s3
+      --addr 0.0.0.0:9000
+      --force-path-style
+      --auth-key ${S3_ACCESS_KEY},${S3_SECRET_KEY}
+      /data
+    volumes:
+      - ${RCLONE_AVATAR_DATA_PATH:-./rclone/local-storage}:/data
+    networks:
+      - prism-net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "9000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ============================================================
+  # Rclone Nginx - S3 代理 + 预签名 URL 生成
+  # 功能: SigV4 代理签名、浏览器直传预签名、CORS
+  # ============================================================
+  rclone-nginx:
+    build: ./rclone/nginx
+    container_name: prism-rclone-nginx
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${RCLONE_NGINX_PORT:-5208}:5001"
+    volumes:
+      - ./rclone/nginx/nginx-conf:/data:ro
+      - ./rclone/nginx/njs:/etc/nginx/njs:ro
+    environment:
+      - NGINX_SERVER_NAME=${RCLONE_NGINX_SERVER_NAME:-localhost}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_HOST=${S3_HOST:-localhost:5208}
+      - S3_SCHEME=${S3_SCHEME:-http}
+    command: ["/bin/sh", "/data/start-nginx.sh"]
+    depends_on:
+      rclone-avatar:
+        condition: service_healthy
+    networks:
+      - prism-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============================================================
+  # Rclone Admin Web GUI（按需启动）
+  # 启动: docker compose --profile admin up -d
+  # 访问: http://127.0.0.1:${RCLONE_ADMIN_PORT:-5209}
+  # ============================================================
+  rclone-admin:
+    image: rclone/rclone:latest
+    container_name: prism-rclone-admin
+    restart: unless-stopped
+    profiles:
+      - admin
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+    command: >
+      rcd
+      --rc-web-gui
+      --rc-web-gui-no-open-browser
+      --rc-addr 0.0.0.0:5572
+      --rc-user ${RCLONE_ADMIN_USER}
+      --rc-pass ${RCLONE_ADMIN_PASS}
+      --config /config/rclone.conf
+    ports:
+      - "127.0.0.1:${RCLONE_ADMIN_PORT:-5209}:5572"
+    volumes:
+      - ${RCLONE_AVATAR_DATA_PATH:-./rclone/local-storage}:/data
+      - ./rclone/rclone-admin:/config:ro
+      - rclone-admin-cache:/root/.cache/rclone
+    networks:
+      - prism-net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "5572"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  casdoor-db-data:
+  rclone-admin-cache:
+
+networks:
+  prism-net:
+    driver: bridge

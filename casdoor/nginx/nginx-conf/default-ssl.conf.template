@@ -1,0 +1,156 @@
+# njs 模块：用于解析请求体过滤 built-in 组织
+js_import casdoor_filter from /data/casdoor_filter.js;
+
+# ==================================================================
+# 外部访问（通过 frpc 隧道），屏蔽 built-in 组织的默认登录/注册
+# ==================================================================
+server {
+    listen 5000 ssl proxy_protocol;
+    server_name ${NGINX_SERVER_NAME};
+
+    # 证书路径
+    ssl_certificate     /etc/nginx/ssl/fullchain.cer;
+    ssl_certificate_key /etc/nginx/ssl/whitestone.top.key;
+
+    # 安全优化配置
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:MozSSL:10m;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+
+    # Docker 内置 DNS
+    resolver 127.0.0.11 valid=10s;
+
+    # njs 子请求缓冲区
+    subrequest_output_buffer_size 16k;
+
+    # 屏蔽 built-in 组织的 UI 页面
+    location ~ ^/(login|signup)(/built-in)?$ {
+        return 403;
+    }
+
+    # ---- 头像预签名上传（会话鉴权 + 转发到 storage nginx）----
+    location = /api/storage/presign {
+        js_content casdoor_filter.authPresign;
+    }
+    location = /_internal_auth_check {
+        internal;
+        proxy_pass http://casdoor:8000/api/get-account;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Accept-Encoding "";
+        proxy_set_header Cookie $http_cookie;
+    }
+    location = /_internal_storage_presign {
+        internal;
+        proxy_pass ${STORAGE_PRESIGN_UPSTREAM}/presign$is_args$args;
+        proxy_http_version 1.1;
+    }
+
+    # 允许其他组织的 OAuth 登录流程
+    location /login/oauth/ {
+        proxy_pass http://casdoor:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # 拦截登录/注册 API，检查 organization 是否为 built-in
+    location = /api/login {
+        client_body_in_single_buffer on;
+        client_body_buffer_size 16k;
+        js_content casdoor_filter.checkBuiltinOrg;
+    }
+    location = /api/signup {
+        client_body_in_single_buffer on;
+        client_body_buffer_size 16k;
+        js_content casdoor_filter.checkBuiltinOrg;
+    }
+
+    # njs 过滤通过后内部跳转
+    location @casdoor_backend {
+        proxy_pass http://casdoor:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    location / {
+        # CORS 配置
+        add_header 'Access-Control-Allow-Origin' '${CORS_ALLOW_ORIGIN}' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE' always;
+        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' '${CORS_ALLOW_ORIGIN}';
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
+            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+            add_header 'Access-Control-Max-Age' 1728000;
+            add_header 'Content-Type' 'text/plain; charset=utf-8';
+            add_header 'Content-Length' 0;
+            return 204;
+        }
+
+        proxy_pass http://casdoor:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+# ==================================================================
+# 内部访问（仅 localhost），用于管理 built-in 组织
+# ==================================================================
+server {
+    listen 8080;
+    server_name localhost;
+
+    # Docker 内置 DNS
+    resolver 127.0.0.11 valid=10s;
+
+    # njs 子请求缓冲区
+    subrequest_output_buffer_size 16k;
+
+    # 头像预签名（内部管理也需要）
+    location = /api/storage/presign {
+        js_content casdoor_filter.authPresign;
+    }
+    location = /_internal_auth_check {
+        internal;
+        proxy_pass http://casdoor:8000/api/get-account;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Accept-Encoding "";
+        proxy_set_header Cookie $http_cookie;
+    }
+    location = /_internal_storage_presign {
+        internal;
+        proxy_pass ${STORAGE_PRESIGN_UPSTREAM}/presign$is_args$args;
+        proxy_http_version 1.1;
+    }
+
+    location / {
+        proxy_pass http://casdoor:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP 127.0.0.1;
+        proxy_set_header X-Forwarded-For 127.0.0.1;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}

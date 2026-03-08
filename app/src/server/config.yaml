@@ -1,0 +1,91 @@
+# Prism Example Site 配置文件
+# 覆盖或继承框架默认配置
+
+# 系统配置
+system:
+  env: 'local'  # 环境：public线上环境 local开发环境
+  addr: 3380     # 服务监听端口
+
+# JWT签名（auth.provider=builtin 时使用）
+jwt:
+  signing-key: 'Prism-Example-Site-Secret-Key'
+  expires-time: '7d'
+  buffer-time: '1d'
+  issuer: 'Prism-Example-Site'
+
+# 认证配置
+auth:
+  provider: 'casdoor'
+  casdoor:
+    endpoint: '${CASDOOR_ENDPOINT:-http://localhost:8000}'
+    client-id: '${CASDOOR_CLIENT_ID}'
+    client-secret: '${CASDOOR_CLIENT_SECRET}'
+    certificate: ''
+    organization-name: '${CASDOOR_ORG:-prism-fusion}'
+    application-name: '${CASDOOR_APP:-app-prism-fusion}'
+    external-endpoint: '${CASDOOR_EXTERNAL_ENDPOINT}'
+    token-expire-hours: 0.01
+    refresh-expire-hours: 72
+    s3-endpoint: '${S3_ENDPOINT}'
+    s3-access-key: '${S3_ACCESS_KEY}'
+    s3-secret-key: '${S3_SECRET_KEY}'
+    s3-public-url: '${S3_PUBLIC_URL}'
+
+# 权限控制配置
+rbac:
+  provider: 'casbin'
+  casdoor-enforce:
+    permission-id: 'built-in/permission-built-in'
+    model-id: 'built-in/model-built-in'
+    enforcer-id: 'built-in/enforcer-built-in'
+
+# Zap日志配置
+zap:
+  level: 'info'
+  prefix: '[PRISM-EXAMPLE]'
+  format: 'console'
+  director: 'log'
+  encode-level: 'LowercaseColorLevelEncoder'
+  stacktrace-key: 'stacktrace'
+  max-age: 0
+  show-line: true
+  log-in-console: true
+
+# MySQL配置（优先使用，如果配置了MySQL则忽略SQLite）
+mysql:
+  host: '${DB_HOST}'
+  port: '${DB_PORT}'
+  db-name: '${DB_NAME}'
+  username: '${DB_USER}'
+  password: '${DB_PASSWORD}'
+  config: 'charset=utf8mb4&parseTime=True&loc=Local'
+  max-idle-conns: 10
+  max-open-conns: 100
+  log-mode: 'error'
+  log-zap: false
+
+# SQLite配置（MySQL未配置时使用）
+sqlite:
+  path: './prism_fusion_site.db'
+  max-idle-conns: 10
+  max-open-conns: 100
+  log-mode: 'error'
+  log-zap: false
+
+# 验证码配置
+captcha:
+  key-long: 6
+  img-width: 240
+  img-height: 80
+  open-captcha: 0
+  open-captcha-timeout: 3600
+
+# 跨域配置
+cors:
+  mode: 'strict-whitelist'
+  whitelist:
+    - allow-origin: 'http://localhost:3288'
+      allow-methods: 'GET,POST,PUT,DELETE,OPTIONS'
+      allow-headers: 'Content-Type,AccessToken,X-CSRF-Token,Authorization,Token,X-Token,X-User-Id,auth_token'
+      expose-headers: 'Content-Length,Access-Control-Allow-Origin,Access-Control-Allow-Headers,Content-Type'
+      allow-credentials: true    

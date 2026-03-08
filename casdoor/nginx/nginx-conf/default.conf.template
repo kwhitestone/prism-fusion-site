@@ -1,0 +1,49 @@
+# njs 模块：预签名上传鉴权
+js_import casdoor_filter from /data/casdoor_filter.js;
+
+# Casdoor 反向代理（HTTP，本地开发 / Docker 内网）
+# 功能：
+#   - 头像预签名上传鉴权（校验 Casdoor 会话后转发到 Storage nginx）
+#   - 所有请求代理到 Casdoor 后端
+server {
+    listen 8080;
+    server_name ${NGINX_SERVER_NAME};
+
+    # Docker 内置 DNS
+    resolver 127.0.0.11 valid=10s;
+
+    # njs 子请求缓冲区（/api/get-account 响应 ~10KB）
+    subrequest_output_buffer_size 16k;
+
+    # ---- 头像预签名上传（会话鉴权 + 转发到 storage nginx）----
+    location = /api/storage/presign {
+        js_content casdoor_filter.authPresign;
+    }
+    # njs 子请求：校验会话（禁用 gzip 以便 njs 解析 JSON）
+    location = /_internal_auth_check {
+        internal;
+        proxy_pass http://casdoor:8000/api/get-account;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Accept-Encoding "";
+        proxy_set_header Cookie $http_cookie;
+    }
+    location = /_internal_storage_presign {
+        internal;
+        proxy_pass ${STORAGE_PRESIGN_UPSTREAM}/presign$is_args$args;
+        proxy_http_version 1.1;
+    }
+
+    # 所有请求代理到 Casdoor
+    location / {
+        proxy_pass http://casdoor:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
