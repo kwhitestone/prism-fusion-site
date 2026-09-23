@@ -1,7 +1,7 @@
 package service
 
 import (
-	"whitestone.top/prism-fusion/global"
+	"github.com/kwhitestone/prism-fusion/global"
 )
 
 type DashboardService struct{}

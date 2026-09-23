@@ -1,17 +1,17 @@
 package main
 
 import (
-	"whitestone.top/prism-fusion/core"
-	"whitestone.top/prism-fusion/global"
-	"whitestone.top/prism-fusion/initialize"
+	"github.com/kwhitestone/prism-fusion/core"
+	"github.com/kwhitestone/prism-fusion/global"
+	"github.com/kwhitestone/prism-fusion/initialize"
 
 	"go.uber.org/zap"
 
 	// 框架内置插件
-	_ "whitestone.top/prism-fusion/addons"
+	_ "github.com/kwhitestone/prism-fusion/addons"
 
 	// 业务插件
-	_ "whitestone.top/prism-example-site/addons"
+	_ "top.whitestone/prism-fusion-site/addons"
 )
 
 //go:generate go env -w GO111MODULE=on

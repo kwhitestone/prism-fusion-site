@@ -1,6 +1,6 @@
 package model
 
-import "whitestone.top/prism-fusion/model"
+import "github.com/kwhitestone/prism-fusion/model"
 
 // ExampleItem 示例数据模型
 type ExampleItem struct {

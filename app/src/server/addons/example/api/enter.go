@@ -1,6 +1,6 @@
 package api
 
-import "whitestone.top/prism-example-site/addons/example/service"
+import "top.whitestone/prism-fusion-site/addons/example/service"
 
 // ExampleApi 示例插件 API 处理器
 type ExampleApi struct {

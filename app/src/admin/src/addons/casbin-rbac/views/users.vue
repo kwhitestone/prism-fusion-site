@@ -442,7 +442,7 @@ onMounted(async () => {
                 :disabled="avatarUploading"
                 @click="triggerEditAvatarInput"
               >
-                {{ avatarUploading ? '上传中...' : '上传头像' }}
+                {{ avatarUploading ? "上传中..." : "上传头像" }}
               </el-button>
               <input
                 ref="editAvatarInputRef"
@@ -521,7 +521,7 @@ onMounted(async () => {
                 :disabled="addAvatarUploading || !addForm.name"
                 @click="triggerAddAvatarInput"
               >
-                {{ addAvatarUploading ? '上传中...' : '上传头像' }}
+                {{ addAvatarUploading ? "上传中..." : "上传头像" }}
               </el-button>
               <input
                 ref="addAvatarInputRef"

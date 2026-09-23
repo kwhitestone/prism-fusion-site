@@ -98,7 +98,11 @@ onMounted(() => {
 <template>
   <div class="messages-container">
     <!-- 提交表单 -->
-    <el-card class="submit-card" shadow="hover">
+    <el-card
+      v-perms="'messages:message:submit'"
+      class="submit-card"
+      shadow="hover"
+    >
       <template #header>
         <div class="card-header">
           <span>📝 提交消息</span>
@@ -142,6 +146,7 @@ onMounted(() => {
           <span>📋 消息列表 ({{ messages.length }})</span>
           <el-button
             v-if="messages.length > 0"
+            v-perms="'messages:message:clear'"
             type="danger"
             size="small"
             @click="clearAll"
@@ -165,6 +170,7 @@ onMounted(() => {
               <div class="message-header">
                 <el-tag size="small">{{ msg.author }}</el-tag>
                 <el-button
+                  v-perms="'messages:message:delete'"
                   type="danger"
                   size="small"
                   text

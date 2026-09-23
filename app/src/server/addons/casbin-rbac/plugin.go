@@ -1,12 +1,12 @@
 package casbinrbac
 
 import (
-	casbinMiddleware "whitestone.top/prism-example-site/addons/casbin-rbac/middleware"
-	casbinModel "whitestone.top/prism-example-site/addons/casbin-rbac/model"
-	casbinRouter "whitestone.top/prism-example-site/addons/casbin-rbac/router"
-	"whitestone.top/prism-example-site/addons/casbin-rbac/service"
-	"whitestone.top/prism-fusion/global"
-	"whitestone.top/prism-fusion/plugin"
+	"github.com/kwhitestone/prism-fusion/global"
+	"github.com/kwhitestone/prism-fusion/plugin"
+	casbinMiddleware "top.whitestone/prism-fusion-site/addons/casbin-rbac/middleware"
+	casbinModel "top.whitestone/prism-fusion-site/addons/casbin-rbac/model"
+	casbinRouter "top.whitestone/prism-fusion-site/addons/casbin-rbac/router"
+	"top.whitestone/prism-fusion-site/addons/casbin-rbac/service"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/gin-gonic/gin"
@@ -40,11 +40,31 @@ func (p *CasbinRbacPlugin) RoutePrefix() string {
 	return "/api/v1/addons/casbin-rbac"
 }
 
-func (p *CasbinRbacPlugin) RegisterRoutes(api huma.API) {
-	if !isEnabled() {
-		return
+// Manifest 声明 V2 身份、依赖与路由边界。
+//
+// 依赖的是本站的 casdoor-auth 而非框架内置 auth：授权中间件消费
+// casdoor JWT 写入的 username/roles/casdoor_owner 上下文，且
+// enforcer 复用 casdoor-auth/conf 的组织配置，必须排在其后启动。
+// admin 子路由同属本前缀，单一作用域即可覆盖。
+func (p *CasbinRbacPlugin) Manifest() plugin.Manifest {
+	return plugin.Manifest{
+		APIVersion:  plugin.APIVersionV2,
+		ID:          "casbin-rbac",
+		Version:     "2.0.0",
+		Kind:        plugin.KindBackendAddon,
+		Description: p.Description(),
+		Provides:    []string{"authorization.rbac"},
+		Requires:    []plugin.Dependency{{ID: "casdoor-auth"}},
+		RouteScopes: []string{p.RoutePrefix()},
 	}
+}
 
+// PluginEnabled 把 provider 选择上移为框架激活契约。
+func (p *CasbinRbacPlugin) PluginEnabled() bool {
+	return isEnabled()
+}
+
+func (p *CasbinRbacPlugin) RegisterRoutes(api huma.API) {
 	// 确保 Casdoor SDK 已初始化（远程 Casbin 需要通过 Casdoor API 调用）
 	service.InitCasdoorSDK()
 
@@ -58,18 +78,12 @@ func (p *CasbinRbacPlugin) RegisterRoutes(api huma.API) {
 }
 
 func (p *CasbinRbacPlugin) Models() []interface{} {
-	if !isEnabled() {
-		return nil
-	}
 	return []interface{}{
 		&casbinModel.CasbinMenu{},
 	}
 }
 
 func (p *CasbinRbacPlugin) GlobalMiddlewares() []gin.HandlerFunc {
-	if !isEnabled() {
-		return nil
-	}
 	return []gin.HandlerFunc{
 		casbinMiddleware.CasbinAuthzMiddleware(),
 	}

@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"whitestone.top/prism-fusion/global"
+	"github.com/kwhitestone/prism-fusion/global"
 )
 
 // CasdoorConfig Casdoor 认证服务配置（由插件自管理，不放入核心 config 包）

@@ -2,10 +2,10 @@ const Layout = () => import("@/layout/index.vue");
 
 export default [
   {
-    path: "/",
+    path: "/dashboard",
     name: "Prism",
     component: Layout,
-    redirect: "/dashboard",
+    redirect: "/dashboard/index",
     meta: {
       icon: "ep:data-analysis",
       title: "Prism Fusion",
@@ -13,7 +13,7 @@ export default [
     },
     children: [
       {
-        path: "/dashboard",
+        path: "/dashboard/index",
         name: "PrismDashboard",
         component: () => import("../views/index.vue"),
         meta: {

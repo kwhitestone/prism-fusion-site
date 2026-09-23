@@ -9,17 +9,20 @@
  * 所有 OAuth 逻辑完全封装在此组件内，核心登录页无需了解具体认证方式。
  */
 import Motion from "@/views/login/utils/motion";
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { message } from "@/utils/message";
 import { useUserStoreHook } from "@/store/modules/user";
 import { initRouter, getTopMenu } from "@/router/utils";
 import { setToken, setAuthToken } from "@/utils/auth";
 import {
-  getSigninUrl,
-  signinCallback,
-  getUserInfo
-} from "../api";
+  createAuthRequestID,
+  invalidateAuthSession,
+  observeAuthSession,
+  withAuthSessionLock
+} from "@/core/auth-session";
+import { triggerPluginRegistryReport } from "@/plugin/loader";
+import { getSigninUrl, signinCallback } from "../api";
 
 const router = useRouter();
 const route = useRoute();
@@ -28,6 +31,10 @@ const route = useRoute();
 const loading = ref(false);
 const isProcessingCallback = ref(false);
 const statusText = ref("");
+let active = true;
+onUnmounted(() => {
+  active = false;
+});
 
 // ========== OAuth 回调处理 ==========
 onMounted(async () => {
@@ -50,49 +57,42 @@ onMounted(async () => {
       redirectUri: `${window.location.origin}/login`
     });
     const body = res.data;
+    if (!active) return;
 
     if (body.code !== 0) {
       throw new Error(body.message || "授权码交换失败");
     }
 
     const { accessToken, refreshToken, expiresIn, user } = body.data;
-    setAuthToken(`Bearer ${accessToken}`);
-
-    // 获取用户完整信息（角色、头像等）
-    let roles = ["user"];
+    const roles = user?.isAdmin ? ["admin"] : ["user"];
     const permissions: string[] = ["*:*:*"];
-    let avatar = "";
-    try {
-      const infoRes = await getUserInfo();
-      if (infoRes.data?.code === 0 && infoRes.data?.data) {
-        roles = infoRes.data.data.roles || roles;
-        avatar = infoRes.data.data.avatar || "";
-      }
-    } catch {
-      if (user?.isAdmin) roles = ["admin"];
-    }
 
     // 存储 token 和用户信息
     const expireMs = (expiresIn || 360) * 1000; // 服务端返回秒数
     const tokenData = {
-      avatar,
+      avatar: "",
       username: user?.username || "",
       nickname: user?.nickName || user?.username || "",
       roles,
       permissions,
       accessToken,
       refreshToken: refreshToken || accessToken,
+      sessionId: createAuthRequestID(),
+      refreshRequestId: createAuthRequestID(),
       expires: new Date(Date.now() + expireMs)
     };
-    setToken(tokenData);
+    const committed = await withAuthSessionLock(async () => {
+      if (!active) return false;
+      invalidateAuthSession();
+      setAuthToken(`Bearer ${accessToken}`);
+      setToken(tokenData);
+      observeAuthSession(tokenData.sessionId);
+      return true;
+    });
+    if (!committed || !active) return;
+    triggerPluginRegistryReport();
 
-    // 更新 store
     const userStore = useUserStoreHook();
-    userStore.SET_AVATAR(tokenData.avatar);
-    userStore.SET_USERNAME(tokenData.username);
-    userStore.SET_NICKNAME(tokenData.nickname);
-    userStore.SET_ROLES(tokenData.roles);
-    userStore.SET_PERMS(tokenData.permissions);
 
     statusText.value = "登录成功，正在跳转...";
 
@@ -102,10 +102,10 @@ onMounted(async () => {
     window.history.replaceState({}, "", cleanUrl);
 
     // 初始化路由 & 同步最新用户信息
-    await initRouter();
     await userStore.fetchUserInfo();
+    await initRouter();
 
-    const targetPath = getTopMenu(true)?.path || "/welcome";
+    const targetPath = getTopMenu(true)?.path || "/dashboard/index";
     await router.push(targetPath);
     message("登录成功", { type: "success" });
   } catch (error: any) {

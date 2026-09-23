@@ -84,7 +84,11 @@ onMounted(() => {
     <!-- 页面头部 -->
     <div class="mb-4 flex items-center justify-between">
       <h2 class="text-lg font-semibold">示例插件页面</h2>
-      <el-button type="primary" @click="handleAdd">
+      <el-button
+        v-perms="'example:item:create'"
+        type="primary"
+        @click="handleAdd"
+      >
         <template #icon>
           <IconifyIconOffline icon="ep:plus" />
         </template>
@@ -108,7 +112,12 @@ onMounted(() => {
         <el-table-column prop="created_at" label="创建时间" width="180" />
         <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
-            <el-button type="danger" link @click="handleDelete(row)">
+            <el-button
+              v-perms="'example:item:delete'"
+              type="danger"
+              link
+              @click="handleDelete(row)"
+            >
               删除
             </el-button>
           </template>
@@ -136,7 +145,12 @@ onMounted(() => {
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit">确定</el-button>
+        <el-button
+          v-perms="'example:item:create'"
+          type="primary"
+          @click="handleSubmit"
+          >确定</el-button
+        >
       </template>
     </el-dialog>
   </div>

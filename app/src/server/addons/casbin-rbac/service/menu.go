@@ -3,8 +3,8 @@ package service
 import (
 	"encoding/json"
 
-	"whitestone.top/prism-example-site/addons/casbin-rbac/model"
-	"whitestone.top/prism-fusion/global"
+	"github.com/kwhitestone/prism-fusion/global"
+	"top.whitestone/prism-fusion-site/addons/casbin-rbac/model"
 )
 
 // MenuService 菜单服务（复用 builtin rbac 的菜单树构建逻辑）

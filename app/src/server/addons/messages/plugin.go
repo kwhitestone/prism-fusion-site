@@ -2,19 +2,26 @@
 package messages
 
 import (
-	"whitestone.top/prism-example-site/addons/messages/router"
-	"whitestone.top/prism-fusion/plugin"
+	"github.com/kwhitestone/prism-fusion/plugin"
+	"top.whitestone/prism-fusion-site/addons/messages/router"
 
 	"github.com/danielgtaylor/huma/v2"
 )
 
 func init() {
-	plugin.Register(&MessagesPlugin{})
+	plugin.Register(newMessagesPlugin())
 }
 
 // MessagesPlugin 消息记录插件
 type MessagesPlugin struct {
 	plugin.BasePlugin
+}
+
+func newMessagesPlugin() *MessagesPlugin {
+	return &MessagesPlugin{BasePlugin: plugin.BasePlugin{
+		PluginName:        "messages",
+		PluginDescription: "消息记录插件，提供消息的增删查功能",
+	}}
 }
 
 func (p *MessagesPlugin) Name() string {

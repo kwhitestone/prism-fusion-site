@@ -1,7 +1,7 @@
 package api
 
 import (
-	"whitestone.top/prism-example-site/addons/example/service"
+	"top.whitestone/prism-fusion-site/addons/example/service"
 )
 
 // GetItems 获取示例项列表

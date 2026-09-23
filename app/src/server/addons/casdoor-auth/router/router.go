@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"whitestone.top/prism-example-site/addons/casdoor-auth/conf"
-	"whitestone.top/prism-example-site/addons/casdoor-auth/service"
-	"whitestone.top/prism-fusion/global"
+	"github.com/kwhitestone/prism-fusion/global"
+	"top.whitestone/prism-fusion-site/addons/casdoor-auth/conf"
+	"top.whitestone/prism-fusion-site/addons/casdoor-auth/service"
 
 	"github.com/danielgtaylor/huma/v2"
 	"go.uber.org/zap"

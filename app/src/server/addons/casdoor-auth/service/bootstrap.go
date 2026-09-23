@@ -19,8 +19,8 @@ import (
 	"sync"
 	"time"
 
-	"whitestone.top/prism-example-site/addons/casdoor-auth/conf"
-	"whitestone.top/prism-fusion/global"
+	"github.com/kwhitestone/prism-fusion/global"
+	"top.whitestone/prism-fusion-site/addons/casdoor-auth/conf"
 
 	"go.uber.org/zap"
 )

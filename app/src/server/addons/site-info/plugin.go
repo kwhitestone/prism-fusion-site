@@ -5,18 +5,25 @@ import (
 	"context"
 	"net/http"
 
-	"whitestone.top/prism-fusion/plugin"
+	"github.com/kwhitestone/prism-fusion/plugin"
 
 	"github.com/danielgtaylor/huma/v2"
 )
 
 func init() {
-	plugin.Register(&SiteInfoPlugin{})
+	plugin.Register(newSiteInfoPlugin())
 }
 
 // SiteInfoPlugin 站点信息插件
 type SiteInfoPlugin struct {
 	plugin.BasePlugin
+}
+
+func newSiteInfoPlugin() *SiteInfoPlugin {
+	return &SiteInfoPlugin{BasePlugin: plugin.BasePlugin{
+		PluginName:        "site-info",
+		PluginDescription: "站点信息插件，展示业务插件开发方式",
+	}}
 }
 
 func (p *SiteInfoPlugin) Name() string {

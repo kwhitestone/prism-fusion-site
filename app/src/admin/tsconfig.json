@@ -20,11 +20,13 @@
     "resolveJsonModule": true,
     "lib": ["ESNext", "DOM"],
     "paths": {
-      "@/*": ["../../../prism-fusion/src/admin/src/*"],
-      "@build/*": ["../../../prism-fusion/src/admin/build/*"],
+      "@/*": ["../../../prism-fusion/src/web/src/*"],
+      "@build/*": ["../../../prism-fusion/src/web/build/*"],
       "@biz/*": ["src/*"],
-      "prism-fusion-admin": ["../../../prism-fusion/src/admin/src/core/index.ts"],
-      "prism-fusion-admin/plugin": ["../../../prism-fusion/src/admin/src/plugin/index.ts"]
+      "prism-fusion-web": ["../../../prism-fusion/src/web/src/core/index.ts"],
+      "prism-fusion-web/plugin": [
+        "../../../prism-fusion/src/web/src/plugin/index.ts"
+      ]
     },
     "types": [
       "node",
@@ -39,8 +41,8 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "src/**/*.vue",
-    "../../../prism-fusion/src/admin/types/*.d.ts",
-    "../../../prism-fusion/src/admin/env-web.d.ts",
+    "../../../prism-fusion/src/web/types/*.d.ts",
+    "../../../prism-fusion/src/web/env-web.d.ts",
     "vite.config.ts"
   ],
   "exclude": ["dist", "**/*.js", "node_modules"]

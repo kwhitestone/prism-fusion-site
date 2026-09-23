@@ -3,8 +3,8 @@ package service
 import (
 	"fmt"
 
-	"whitestone.top/prism-example-site/addons/casdoor-auth/conf"
-	casdoorService "whitestone.top/prism-example-site/addons/casdoor-auth/service"
+	"top.whitestone/prism-fusion-site/addons/casdoor-auth/conf"
+	casdoorService "top.whitestone/prism-fusion-site/addons/casdoor-auth/service"
 
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
 )

@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
-	"whitestone.top/prism-example-site/addons/messages/service"
+	"top.whitestone/prism-fusion-site/addons/messages/service"
 )
 
 var messagesService = service.MessagesService{}

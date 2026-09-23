@@ -12,9 +12,9 @@ import {
   getPlatformConfig,
   installPlugins,
   registerExternalPlugins,
-  setFooterComponent,
+  configurePluginHost,
   injectResponsiveStorage
-} from "prism-fusion-admin";
+} from "prism-fusion-web";
 
 // ========== 框架样式 ==========
 import "@/style/reset.scss";
@@ -54,9 +54,6 @@ import dashboardPlugin from "./addons/dashboard";
 import examplePlugin from "./addons/example";
 import messagesPlugin from "./addons/messages";
 
-// ========== 业务组件 ==========
-import LegalFooter from "@biz/components/LegalFooter";
-
 // 注册业务插件到框架
 registerExternalPlugins([
   casdoorAuthPlugin,
@@ -67,8 +64,7 @@ registerExternalPlugins([
   messagesPlugin
 ]);
 
-// 注册登录页页脚（备案信息）
-setFooterComponent(LegalFooter);
+configurePluginHost({ homePath: "/dashboard/index" });
 
 // ========== 启动应用 ==========
 const app = createApp(App);
@@ -86,16 +82,21 @@ app.component("FontIcon", FontIcon);
 // 注册 vue-tippy
 app.use(VueTippy);
 
-getPlatformConfig(app).then(async config => {
-  setupStore(app);
-  app.use(router);
+getPlatformConfig(app)
+  .then(async config => {
+    setupStore(app);
+    // 安装插件（框架内置 + 业务插件）
+    await installPlugins(app, router);
 
-  // 安装插件（框架内置 + 业务插件）
-  await installPlugins(app, router);
+    app.use(router);
+    await router.isReady();
+    injectResponsiveStorage(app, config);
+    app.use(MotionPlugin).use(useElementPlus).use(Table);
 
-  await router.isReady();
-  injectResponsiveStorage(app, config);
-  app.use(MotionPlugin).use(useElementPlus).use(Table);
-
-  app.mount("#app");
-});
+    app.mount("#app");
+  })
+  .catch(error => {
+    console.error("[Startup] Application initialization failed", error);
+    const root = document.querySelector("#app");
+    if (root) root.textContent = "应用初始化失败，请联系管理员并检查插件配置。";
+  });

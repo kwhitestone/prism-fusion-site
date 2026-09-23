@@ -1,8 +1,8 @@
 package service
 
 import (
-	"whitestone.top/prism-example-site/addons/example/model"
-	"whitestone.top/prism-fusion/global"
+	"github.com/kwhitestone/prism-fusion/global"
+	"top.whitestone/prism-fusion-site/addons/example/model"
 )
 
 // ExampleService 示例服务

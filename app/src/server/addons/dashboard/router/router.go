@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/danielgtaylor/huma/v2"
-	"whitestone.top/prism-example-site/addons/dashboard/service"
+	"top.whitestone/prism-fusion-site/addons/dashboard/service"
 )
 
 var dashboardService = service.DashboardService{}

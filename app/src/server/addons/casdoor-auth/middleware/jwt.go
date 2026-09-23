@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	casdoorService "whitestone.top/prism-example-site/addons/casdoor-auth/service"
-	"whitestone.top/prism-fusion/global"
+	"github.com/kwhitestone/prism-fusion/global"
+	casdoorService "top.whitestone/prism-fusion-site/addons/casdoor-auth/service"
 
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
 	"github.com/gin-gonic/gin"

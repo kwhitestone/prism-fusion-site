@@ -16,3 +16,6 @@ app/src/server/__debug_bin*
 # Rclone storage data (keep .gitkeep)
 rclone/local-storage/*
 !rclone/local-storage/.gitkeep
+
+.claude-nd-v2-ref/
+.claude-nd-v2-migration-prompt.md

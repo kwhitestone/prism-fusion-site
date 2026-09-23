@@ -6,12 +6,15 @@ system:
   env: 'local'  # 环境：public线上环境 local开发环境
   addr: 3380     # 服务监听端口
 
-# JWT签名（auth.provider=builtin 时使用）
+# JWT签名（auth.provider=builtin 时使用；本站 provider=casdoor，Token 由 Casdoor 签发）
 jwt:
-  signing-key: 'Prism-Example-Site-Secret-Key'
-  expires-time: '7d'
-  buffer-time: '1d'
-  issuer: 'Prism-Example-Site'
+  signing-key: '${JWT_SECRET}'
+  expires-time: '15m'
+  refresh-expires-time: '720h'
+  refresh-family-expires-time: '2160h'
+  refresh-rotation-grace: '60s'
+  buffer-time: '5m'
+  issuer: 'Prism-Fusion-Site'
 
 # 认证配置
 auth:
@@ -86,6 +89,6 @@ cors:
   whitelist:
     - allow-origin: 'http://localhost:3288'
       allow-methods: 'GET,POST,PUT,DELETE,OPTIONS'
-      allow-headers: 'Content-Type,AccessToken,X-CSRF-Token,Authorization,Token,X-Token,X-User-Id,auth_token'
+      allow-headers: 'Content-Type,AccessToken,X-CSRF-Token,X-Refresh-Cookie-Only,X-Refresh-Request-ID,Authorization,Token,X-Token,X-User-Id,auth_token'
       expose-headers: 'Content-Length,Access-Control-Allow-Origin,Access-Control-Allow-Headers,Content-Type'
       allow-credentials: true    

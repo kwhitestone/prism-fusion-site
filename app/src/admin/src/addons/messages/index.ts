@@ -1,4 +1,4 @@
-import type { PluginModule } from "prism-fusion-admin/plugin";
+import type { PluginModule } from "prism-fusion-web/plugin";
 import routes from "./router";
 
 const plugin: PluginModule = {
@@ -7,10 +7,10 @@ const plugin: PluginModule = {
   version: "1.0.0",
   routes,
   permissions: [
-    { key: "messages:view", name: "查看消息列表" },
-    { key: "messages:submit", name: "提交消息" },
-    { key: "messages:delete", name: "删除消息" },
-    { key: "messages:clear", name: "清空所有消息" }
+    { key: "messages:message:view", name: "查看消息列表" },
+    { key: "messages:message:submit", name: "提交消息" },
+    { key: "messages:message:delete", name: "删除消息" },
+    { key: "messages:message:clear", name: "清空所有消息" }
   ]
 };
 

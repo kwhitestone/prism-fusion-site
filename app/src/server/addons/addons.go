@@ -5,15 +5,15 @@ package addons
 
 import (
 	// 认证插件 - Casdoor OAuth2（优先级 10，provider=casdoor）
-	_ "whitestone.top/prism-example-site/addons/casdoor-auth"
+	_ "top.whitestone/prism-fusion-site/addons/casdoor-auth"
 	// 权限管理插件 - Casbin（优先级 20，provider=casbin）
-	_ "whitestone.top/prism-example-site/addons/casbin-rbac"
+	_ "top.whitestone/prism-fusion-site/addons/casbin-rbac"
 	// 示例业务插件
-	_ "whitestone.top/prism-example-site/addons/site-info"
+	_ "top.whitestone/prism-fusion-site/addons/site-info"
 	// 数据总览插件
-	_ "whitestone.top/prism-example-site/addons/dashboard"
+	_ "top.whitestone/prism-fusion-site/addons/dashboard"
 	// 示例插件
-	_ "whitestone.top/prism-example-site/addons/example"
+	_ "top.whitestone/prism-fusion-site/addons/example"
 	// 消息记录插件
-	_ "whitestone.top/prism-example-site/addons/messages"
+	_ "top.whitestone/prism-fusion-site/addons/messages"
 )

@@ -11,6 +11,8 @@
 .gitignore
 .gitattributes
 .gitmodules
+.claude-nd-v2-ref/
+.claude-nd-v2-*-prompt.md
 **/.git/
 
 # ---- Casdoor（子模块源码 + 配置，仅 docker-compose 运行时用）----

@@ -9,12 +9,12 @@ import Icons from "unplugin-icons/vite";
 /**
  * Prism Example Site - Vite 配置
  *
- * 通过 pnpm workspace 引用 prism-fusion-admin 框架源码，
+ * 通过 pnpm workspace 引用 prism-fusion-web 框架源码，
  * 使用 alias 让框架内部的 @/ 引用正确解析到框架 src 目录。
  */
 
 // 框架源码路径
-const frameworkRoot = resolve(__dirname, "../../../prism-fusion/src/admin");
+const frameworkRoot = resolve(__dirname, "../../../prism-fusion/src/web");
 const frameworkSrc = resolve(frameworkRoot, "src");
 const frameworkBuild = resolve(frameworkRoot, "build");
 
@@ -66,7 +66,7 @@ export default defineConfig(({ mode }) => {
     ],
     // 不预构建框架 workspace 包，确保 HMR 实时生效
     optimizeDeps: {
-      exclude: ["prism-fusion-admin"]
+      exclude: ["prism-fusion-web"]
     },
     build: {
       target: "es2015",

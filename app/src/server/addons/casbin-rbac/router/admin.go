@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"whitestone.top/prism-example-site/addons/casbin-rbac/service"
+	"top.whitestone/prism-fusion-site/addons/casbin-rbac/service"
 
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -98,7 +98,7 @@ type AdminPresignAvatarInput struct {
 
 type AdminPresignAvatarOutput struct {
 	Body struct {
-		Code    int `json:"code" doc:"状态码"`
+		Code    int    `json:"code" doc:"状态码"`
 		Message string `json:"message" doc:"响应消息"`
 		Data    struct {
 			PresignedURL string `json:"presignedUrl" doc:"预签名 PUT URL（浏览器直传用）"`

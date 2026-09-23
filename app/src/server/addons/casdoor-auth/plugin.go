@@ -1,12 +1,12 @@
 package casdoorauth
 
 import (
-	"whitestone.top/prism-example-site/addons/casdoor-auth/conf"
-	casdoorMiddleware "whitestone.top/prism-example-site/addons/casdoor-auth/middleware"
-	casdoorRouter "whitestone.top/prism-example-site/addons/casdoor-auth/router"
-	"whitestone.top/prism-example-site/addons/casdoor-auth/service"
-	"whitestone.top/prism-fusion/global"
-	"whitestone.top/prism-fusion/plugin"
+	"github.com/kwhitestone/prism-fusion/global"
+	"github.com/kwhitestone/prism-fusion/plugin"
+	"top.whitestone/prism-fusion-site/addons/casdoor-auth/conf"
+	casdoorMiddleware "top.whitestone/prism-fusion-site/addons/casdoor-auth/middleware"
+	casdoorRouter "top.whitestone/prism-fusion-site/addons/casdoor-auth/router"
+	"top.whitestone/prism-fusion-site/addons/casdoor-auth/service"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/gin-gonic/gin"
@@ -40,11 +40,30 @@ func (p *CasdoorAuthPlugin) RoutePrefix() string {
 	return "/api/v1/addons/casdoor-auth"
 }
 
-func (p *CasdoorAuthPlugin) RegisterRoutes(api huma.API) {
-	if !isEnabled() {
-		return
+// Manifest 声明 V2 身份与路由边界。
+//
+// 本站以 casdoor 取代框架内置 auth，两者通过 auth.provider 互斥：
+// 内置 auth 在 provider=casdoor 时不激活，而未激活的依赖等同缺失，
+// 因此这里不能声明 Requires{auth}，否则启动会因缺依赖而失败。
+func (p *CasdoorAuthPlugin) Manifest() plugin.Manifest {
+	return plugin.Manifest{
+		APIVersion:  plugin.APIVersionV2,
+		ID:          "casdoor-auth",
+		Version:     "2.0.0",
+		Kind:        plugin.KindBackendAddon,
+		Description: p.Description(),
+		Provides:    []string{"auth.identity"},
+		RouteScopes: []string{p.RoutePrefix()},
 	}
+}
 
+// PluginEnabled 把 provider 选择上移为框架激活契约。
+// 冻结后该决定不可变，插件方法内不再各自切换行为。
+func (p *CasdoorAuthPlugin) PluginEnabled() bool {
+	return isEnabled()
+}
+
+func (p *CasdoorAuthPlugin) RegisterRoutes(api huma.API) {
 	// 初始化插件自有配置（从 viper 读取 auth.casdoor 段）
 	conf.Init()
 
@@ -67,9 +86,6 @@ func (p *CasdoorAuthPlugin) Models() []interface{} {
 }
 
 func (p *CasdoorAuthPlugin) GlobalMiddlewares() []gin.HandlerFunc {
-	if !isEnabled() {
-		return nil
-	}
 	return []gin.HandlerFunc{
 		casdoorMiddleware.CasdoorJwtMiddleware(),
 	}

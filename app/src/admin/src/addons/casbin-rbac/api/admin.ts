@@ -94,18 +94,24 @@ export function updateUserProfile(data: {
 
 /** 获取头像预签名 PUT URL */
 export function presignAvatarUpload(name: string, filename: string) {
-  return http.request<
-    ApiResponse<{ presignedUrl: string; avatarUrl: string }>
-  >("get", `${BASE}/users/avatar/presign`, {
-    params: { name, filename: encodeURIComponent(filename) }
-  });
+  return http.request<ApiResponse<{ presignedUrl: string; avatarUrl: string }>>(
+    "get",
+    `${BASE}/users/avatar/presign`,
+    {
+      params: { name, filename: encodeURIComponent(filename) }
+    }
+  );
 }
 
 /** 前端通过预签名 URL 直传文件到 S3 后，调用此接口将 URL 写入 Casdoor */
 export function confirmAvatarUpload(name: string, avatarUrl: string) {
-  return http.request<ApiResponse<null>>("post", `${BASE}/users/avatar/confirm`, {
-    data: { name, avatarUrl }
-  });
+  return http.request<ApiResponse<null>>(
+    "post",
+    `${BASE}/users/avatar/confirm`,
+    {
+      data: { name, avatarUrl }
+    }
+  );
 }
 
 /**

@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kwhitestone/prism-fusion/global"
 	"go.uber.org/zap"
-	"whitestone.top/prism-fusion/global"
 )
 
 // ExampleMiddleware 示例插件作用域中间件
@@ -14,6 +14,8 @@ import (
 func ExampleMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
+		// 作用域标记：用于验证中间件不会泄漏到兄弟插件的路由
+		c.Header("X-Example-Middleware", "active")
 
 		// 处理请求
 		c.Next()

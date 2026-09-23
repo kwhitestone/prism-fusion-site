@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"whitestone.top/prism-example-site/addons/casbin-rbac/service"
+	"top.whitestone/prism-fusion-site/addons/casbin-rbac/service"
 
 	"github.com/danielgtaylor/huma/v2"
 )

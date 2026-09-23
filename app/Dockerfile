@@ -24,7 +24,7 @@ ENV ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ \
 
 RUN npm config set registry https://registry.npmmirror.com/ && \
     npm config set cache /tmp/.npm && \
-    npm install -g pnpm && \
+    npm install -g pnpm@9.15.4 && \
     pnpm config set registry https://registry.npmmirror.com/
 
 # 复制 pnpm workspace 配置
@@ -33,14 +33,14 @@ COPY app/src/admin/.npmrc /build/app/src/admin/
 COPY app/src/admin/package.json app/src/admin/pnpm-lock.yaml /build/app/src/admin/
 
 # 复制框架前端 package.json（workspace 需要）
-COPY prism-fusion/src/admin/package.json /build/prism-fusion/src/admin/
+COPY prism-fusion/src/web/package.json /build/prism-fusion/src/web/
 
 # 安装依赖（lockfile 在 workspace root: app/src/admin/）
 WORKDIR /build/app/src/admin
 RUN pnpm install --frozen-lockfile
 
 # 复制框架前端源码
-COPY prism-fusion/src/admin/ /build/prism-fusion/src/admin/
+COPY prism-fusion/src/web/ /build/prism-fusion/src/web/
 
 # 复制业务前端源码
 COPY app/src/admin/ /build/app/src/admin/
@@ -49,7 +49,7 @@ COPY app/src/admin/ /build/app/src/admin/
 RUN pnpm run build
 
 # ========== 阶段2: Go后端构建阶段 ==========
-FROM ${REGISTRY}/golang:1.25.5 AS backend-builder
+FROM ${REGISTRY}/golang:1.26.8 AS backend-builder
 
 ENV GO111MODULE=on \
     GOPROXY=https://goproxy.cn,direct \

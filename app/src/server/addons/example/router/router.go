@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/danielgtaylor/huma/v2"
-	"whitestone.top/prism-example-site/addons/example/service"
+	"top.whitestone/prism-fusion-site/addons/example/service"
 )
 
 // exampleService 示例服务实例
