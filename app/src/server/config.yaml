@@ -4,7 +4,7 @@
 # 系统配置
 system:
   env: 'local'  # 环境：public线上环境 local开发环境
-  addr: 3380     # 服务监听端口
+  addr: 3380     # 本地配置默认值；容器由 GATEWAY_PORT 覆盖，compose 默认 3280
 
 # JWT签名（auth.provider=builtin 时使用；本站 provider=casdoor，Token 由 Casdoor 签发）
 jwt:
@@ -91,4 +91,4 @@ cors:
       allow-methods: 'GET,POST,PUT,DELETE,OPTIONS'
       allow-headers: 'Content-Type,AccessToken,X-CSRF-Token,X-Refresh-Cookie-Only,X-Refresh-Request-ID,Authorization,Token,X-Token,X-User-Id,auth_token'
       expose-headers: 'Content-Length,Access-Control-Allow-Origin,Access-Control-Allow-Headers,Content-Type'
-      allow-credentials: true    
+      allow-credentials: true

@@ -1,7 +1,6 @@
 # ==================================================
 # Docker 构建忽略文件
 # 仅 prism-fusion-site 主应用构建需要:
-#   app/src/admin/   (前端源码)
 #   app/src/server/  (Go 后端源码)
 #   prism-fusion/    (框架子模块)
 # ==================================================
@@ -12,8 +11,10 @@
 .gitattributes
 .gitmodules
 .claude-nd-v2-ref/
+.pfs-split-work/
 .claude-nd-v2-*-prompt.md
 **/.git/
+prism-fusion/src/web/
 
 # ---- Casdoor（子模块源码 + 配置，仅 docker-compose 运行时用）----
 casdoor/

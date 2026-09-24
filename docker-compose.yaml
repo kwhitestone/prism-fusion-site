@@ -25,9 +25,9 @@ services:
     container_name: prism-fusion-site
     restart: unless-stopped
     ports:
-      - "${GATEWAY_PORT:-3280}:3280"
+      - "${GATEWAY_PORT:-3280}:${GATEWAY_PORT:-3280}"
     environment:
-      GATEWAY_PORT: "${GATEWAY_PORT:-3180}"
+      GATEWAY_PORT: "${GATEWAY_PORT:-3280}"
       # Casdoor 认证配置
       CASDOOR_ENDPOINT: "http://casdoor:8000"
       CASDOOR_CLIENT_ID: "${CASDOOR_CLIENT_ID}"

@@ -23,6 +23,10 @@
 
 基于 [Prism Fusion](https://github.com/kwhitestone/prism-fusion) 框架构建的集成站点 —— 通过 git submodule 引用框架，以插件方式集成 Casdoor 单点登录、Casbin 动态权限、Rclone S3 兼容存储，开箱即用。
 
+本站前端已迁至独立仓库 [prism-fusion-site-web](https://github.com/kwhitestone/prism-fusion-site-web)。
+本仓构建 Go 后端镜像，不再构建或携带站点 Vue 静态资源。框架子模块保持完整，
+前端仓使用固定版本 vendor，不再通过本仓的 pnpm workspace 引用框架。
+
 ### 特性
 
 - **Casdoor SSO** — OAuth2 登录 + 自动 Bootstrap（组织 / 应用 / Provider 一键初始化）
@@ -49,17 +53,7 @@ prism-fusion-site/
 │   │   ├── go.mod / go.work       # Go workspace（引用框架）
 │   │   ├── config.yaml            # 业务配置（覆盖框架默认值）
 │   │   └── main.go                # 入口
-│   ├── src/admin/                 # Vue 前端
-│   │   ├── src/addons/            # 业务插件（前端）
-│   │   │   ├── casdoor-auth/      #   Casdoor 登录界面
-│   │   │   ├── casbin-rbac/       #   动态路由管理
-│   │   │   ├── dashboard/         #   数据总览页面
-│   │   │   ├── messages/          #   消息页面
-│   │   │   ├── site-info/         #   站点信息页面
-│   │   │   └── example/           #   示例插件页面
-│   │   ├── pnpm-workspace.yaml    # pnpm workspace（引用框架前端）
-│   │   └── package.json
-│   └── Dockerfile                 # 多阶段生产构建（Node + Go + Alpine）
+│   └── Dockerfile                 # 后端生产构建（Go + Alpine）
 ├── casdoor/                       # Casdoor IAM 服务
 │   ├── casdoor/                   #   Casdoor 源码（git submodule）
 │   ├── web_prism/                 #   定制前端（覆盖 Casdoor 默认 UI）
@@ -84,11 +78,10 @@ prism-fusion-site/
 | 层 | 机制 | 配置文件 |
 |----|------|---------|
 | Go 后端 | `go.work` 多模块工作空间 | `app/src/server/go.work` |
-| Vue 前端 | pnpm workspace 包引用 | `app/src/admin/pnpm-workspace.yaml` |
-| Vite | `@` alias 指向框架 src | `app/src/admin/vite.config.ts` |
+| Vue 前端 | 独立仓 + 固定版本 vendor | `prism-fusion-site-web` 仓 |
 | 部署 | git submodule | `.gitmodules` |
 
-业务代码中使用 `@biz/` 别名引用业务模块，`@/` 引用框架模块。
+前端仓中 `@biz/` 引用业务模块，`@/` 引用仓内 vendor 框架模块。
 
 ## 服务架构
 
@@ -97,7 +90,7 @@ prism-fusion-site/
 ```
                    ┌─────────────────────────────────────────────┐
   :3280            │          prism-fusion-site                  │
-  (主应用)         │  Go backend + Vue SPA + Supervisor          │
+  (后端 API)       │  Go backend + Supervisor                    │
                    └──────┬──────────────────┬──────────────────┘
                           │                  │
                   ┌───────▼───────┐  ┌───────▼────────┐
@@ -119,7 +112,7 @@ prism-fusion-site/
 
 | 服务 | 容器名 | 宿主机端口 | 说明 |
 |------|--------|-----------|------|
-| `prism-fusion-site` | prism-fusion-site | `${GATEWAY_PORT:-3280}` | 主应用（Go + Vue） |
+| `prism-fusion-site` | prism-fusion-site | `${GATEWAY_PORT:-3280}` | Go 后端 API |
 | `casdoor-nginx` | prism-casdoor-nginx | `${CASDOOR_NGINX_PORT:-5203}` | Casdoor 反代 + 预签名鉴权 |
 | `casdoor` | prism-casdoor | *(仅内网)* | Casdoor 服务（定制前端） |
 | `casdoor-db` | prism-casdoor-db | `127.0.0.1:${CASDOOR_DB_PORT:-3301}` | Casdoor MySQL |
@@ -132,9 +125,7 @@ prism-fusion-site/
 
 | 工具 | 版本 |
 |------|------|
-| Go | >= 1.25 |
-| Node.js | >= 22 |
-| pnpm | >= 9 |
+| Go | >= 1.26 |
 | Docker + Compose | 部署时需要 |
 
 ## 本地开发
@@ -154,7 +145,7 @@ cp .env.example .env   # 按需修改
 ```bash
 cd app/src/server
 go mod tidy
-go run main.go
+GATEWAY_PORT=3280 go run main.go
 # 监听 :3280
 ```
 
@@ -167,8 +158,9 @@ go run main.go
 ### 3. 启动前端
 
 ```bash
-cd app/src/admin
-pnpm install
+git clone git@github.com:kwhitestone/prism-fusion-site-web.git
+cd prism-fusion-site-web
+pnpm install --frozen-lockfile
 pnpm dev
 # 访问 http://localhost:3288
 ```
@@ -192,14 +184,14 @@ pnpm dev
 
 1. 后端：在 `app/src/server/addons/` 下创建插件目录，实现 `Plugin` 接口
 2. 在 `app/src/server/addons/addons.go` 中添加 `import _ "whitestone.top/prism-fusion-site/addons/my-plugin"`
-3. 前端：在 `app/src/admin/src/addons/` 下创建插件目录，导出 `PluginModule`（自动发现，无需配置）
+3. 前端：在独立前端仓的 `src/addons/` 下创建插件，导出 `PluginModule`，在 `src/main.ts` 显式注册
 
 ## 打包部署
 
 ### Docker 构建（仅主应用镜像）
 
 ```bash
-# 从项目根目录执行（多阶段构建：Node 前端 → Go 后端 → Alpine 运行时）
+# 从项目根目录执行（Go 后端 → Alpine 运行时）
 docker build -f app/Dockerfile -t prism-fusion-site .
 ```
 
@@ -239,7 +231,8 @@ docker compose ps
 docker compose logs -f prism-fusion-site
 ```
 
-- 主应用：http://localhost:3280
+- 后端健康检查：http://localhost:3280/health
+- 前端开发服务：http://localhost:3288（独立前端仓）
 - Casdoor 管理台：http://localhost:5203
 - S3 文件浏览：http://localhost:5208
 

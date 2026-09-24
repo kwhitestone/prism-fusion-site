@@ -18,4 +18,5 @@ rclone/local-storage/*
 !rclone/local-storage/.gitkeep
 
 .claude-nd-v2-ref/
+.pfs-split-work/
 .claude-nd-v2-migration-prompt.md
