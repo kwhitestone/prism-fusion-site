@@ -123,7 +123,7 @@ func TestPluginScopeIsolationThroughFrameworkRouter(t *testing.T) {
 	request("invalid-token", "GET", "/api/v1/addons/example/items", "", http.StatusUnauthorized, false)
 	claims := casdoorsdk.Claims{
 		User:             casdoorsdk.User{Owner: "built-in", Name: "integration-user", Roles: []*casdoorsdk.Role{{Name: "user"}}},
-		RegisteredClaims: jwt.RegisteredClaims{Subject: "integration-user", ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour))},
+		RegisteredClaims: jwt.RegisteredClaims{Issuer: casdoor.URL, Audience: jwt.ClaimStrings{"test-client"}, Subject: "integration-user", ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour))},
 	}
 	token, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(key)
 	if err != nil {

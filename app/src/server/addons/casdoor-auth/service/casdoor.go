@@ -521,14 +521,9 @@ func (s *CasdoorService) ExchangeToken(code string, state string, redirectUri st
 		return nil, "", "", errors.New("no PKCE verifier and no client_secret configured, cannot exchange token")
 	}
 
-	// 解析 JWT claims
-	claims, err := casdoorsdk.ParseJwtToken(accessToken)
+	claims, err := s.ParseToken(accessToken)
 	if err != nil {
-		global.PRISM_LOG.Warn("ParseJwtToken failed, falling back to unverified decode", zap.Error(err))
-		claims, err = decodeJwtPayload(accessToken)
-		if err != nil {
-			return nil, "", "", fmt.Errorf("parse token failed: %w", err)
-		}
+		return nil, "", "", err
 	}
 
 	global.PRISM_LOG.Info("ExchangeToken completed",
@@ -578,7 +573,7 @@ func exchangeTokenWithPKCE(endpoint, clientID, code, redirectURI, codeVerifier s
 		// 尝试 form-encoded 解析
 		vals, parseErr := url.ParseQuery(string(body))
 		if parseErr != nil {
-			return "", "", fmt.Errorf("parse token response: %s", string(body))
+			return "", "", errors.New("invalid token endpoint response")
 		}
 		if errVal := vals.Get("error"); errVal != "" {
 			return "", "", fmt.Errorf("%s: %s", errVal, vals.Get("error_description"))
@@ -591,7 +586,7 @@ func exchangeTokenWithPKCE(endpoint, clientID, code, redirectURI, codeVerifier s
 	}
 
 	if tokenResp.AccessToken == "" {
-		return "", "", fmt.Errorf("empty access_token in response: %s", string(body))
+		return "", "", errors.New("token endpoint returned no access token")
 	}
 
 	return tokenResp.AccessToken, tokenResp.RefreshToken, nil
@@ -599,16 +594,7 @@ func exchangeTokenWithPKCE(endpoint, clientID, code, redirectURI, codeVerifier s
 
 // ParseToken 解析验证 Casdoor JWT（用于中间件验证请求中的 token）
 func (s *CasdoorService) ParseToken(accessToken string) (*casdoorsdk.Claims, error) {
-	claims, err := casdoorsdk.ParseJwtToken(accessToken)
-	if err != nil {
-		// 回退：不验签解析，适用于证书自动发现失败的场景
-		global.PRISM_LOG.Debug("ParseJwtToken failed, trying unverified decode", zap.Error(err))
-		claims, err = decodeJwtPayload(accessToken)
-		if err != nil {
-			return nil, fmt.Errorf("invalid casdoor token: %w", err)
-		}
-	}
-	return claims, nil
+	return verifyCasdoorToken(accessToken, conf.Get())
 }
 
 // RefreshToken 刷新 Casdoor Token
@@ -801,7 +787,10 @@ type jwksKey struct {
 // 流程：/.well-known/openid-configuration → jwks_uri → JWKS → RSA PEM
 func fetchCertFromOIDC(endpoint string) (string, error) {
 	// 1. 获取 OIDC 发现配置
-	resp, err := http.Get(endpoint + "/.well-known/openid-configuration")
+	client := &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error {
+		return errors.New("OIDC redirects are not allowed")
+	}}
+	resp, err := client.Get(strings.TrimRight(endpoint, "/") + "/.well-known/openid-configuration")
 	if err != nil {
 		return "", fmt.Errorf("fetch OIDC discovery: %w", err)
 	}
@@ -812,15 +801,20 @@ func fetchCertFromOIDC(endpoint string) (string, error) {
 	}
 
 	var discovery oidcDiscovery
-	if err := json.NewDecoder(resp.Body).Decode(&discovery); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&discovery); err != nil {
 		return "", fmt.Errorf("parse OIDC discovery: %w", err)
 	}
 	if discovery.JwksURI == "" {
 		return "", errors.New("OIDC discovery missing jwks_uri")
 	}
 
-	// 2. 获取 JWKS
-	resp2, err := http.Get(discovery.JwksURI)
+	// 2. Only fetch keys from the configured Casdoor origin, never a token-supplied URL.
+	base, baseErr := url.Parse(endpoint)
+	jwksURL, jwksErr := url.Parse(discovery.JwksURI)
+	if baseErr != nil || jwksErr != nil || jwksURL.Scheme != base.Scheme || jwksURL.Host != base.Host || jwksURL.User != nil {
+		return "", errors.New("JWKS URI must use the configured Casdoor origin")
+	}
+	resp2, err := client.Get(jwksURL.String())
 	if err != nil {
 		return "", fmt.Errorf("fetch JWKS: %w", err)
 	}
@@ -831,13 +825,13 @@ func fetchCertFromOIDC(endpoint string) (string, error) {
 	}
 
 	var jwks jwksResponse
-	if err := json.NewDecoder(resp2.Body).Decode(&jwks); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp2.Body, 1<<20)).Decode(&jwks); err != nil {
 		return "", fmt.Errorf("parse JWKS: %w", err)
 	}
 
 	// 3. 找到第一个 RSA 密钥并转换为 PEM
 	for _, key := range jwks.Keys {
-		if key.Kty == "RSA" && key.N != "" && key.E != "" {
+		if key.Kty == "RSA" && key.N != "" && key.E != "" && (key.Alg == "" || key.Alg == "RS256") && (key.Use == "" || key.Use == "sig") {
 			return rsaJwkToPEM(key.N, key.E)
 		}
 	}
@@ -868,56 +862,4 @@ func rsaJwkToPEM(n, e string) (string, error) {
 
 	pemBlock := &pem.Block{Type: "PUBLIC KEY", Bytes: derBytes}
 	return string(pem.EncodeToMemory(pemBlock)), nil
-}
-
-// ============================================================
-// JWT 回退解码（不验签，仅用于可信的服务端间调用）
-// ============================================================
-
-// decodeJwtPayload 解码 JWT payload 而不验证签名
-// 仅用于 ProxyLogin 等服务端直连 Casdoor 的场景
-func decodeJwtPayload(tokenStr string) (*casdoorsdk.Claims, error) {
-	parts := strings.Split(tokenStr, ".")
-	if len(parts) != 3 {
-		return nil, errors.New("invalid JWT format: expected 3 segments")
-	}
-
-	payload := parts[1]
-	// base64url 需要补齐 padding
-	switch len(payload) % 4 {
-	case 2:
-		payload += "=="
-	case 3:
-		payload += "="
-	}
-
-	decoded, err := base64.URLEncoding.DecodeString(payload)
-	if err != nil {
-		// 尝试 RawURLEncoding（无 padding）
-		decoded, err = base64.RawURLEncoding.DecodeString(parts[1])
-		if err != nil {
-			return nil, fmt.Errorf("decode JWT payload: %w", err)
-		}
-	}
-
-	var claims casdoorsdk.Claims
-	if err := json.Unmarshal(decoded, &claims); err != nil {
-		// JWT-Standard tokenFormat 下，address 为 OIDC 标准对象 {"formatted":"", ...}，
-		// 而 casdoorsdk.User.Address 类型是 []string，导致 unmarshal 失败。
-		// 容错处理：将 address 字段置 null 后重试。
-		var raw map[string]json.RawMessage
-		if jsonErr := json.Unmarshal(decoded, &raw); jsonErr == nil {
-			if _, ok := raw["address"]; ok {
-				raw["address"] = json.RawMessage(`null`)
-				if fixed, fixErr := json.Marshal(raw); fixErr == nil {
-					if retryErr := json.Unmarshal(fixed, &claims); retryErr == nil {
-						return &claims, nil
-					}
-				}
-			}
-		}
-		return nil, fmt.Errorf("unmarshal JWT claims: %w", err)
-	}
-
-	return &claims, nil
 }

@@ -25,7 +25,7 @@ var publicPaths = []string{
 }
 
 // CasdoorJwtMiddleware Casdoor JWT 认证全局中间件
-// 使用 Casdoor SDK 验证 Token，设置用户信息到 Context
+// 使用站点验签器验证 Token，设置用户信息到 Context
 func CasdoorJwtMiddleware() gin.HandlerFunc {
 	svc := &casdoorService.CasdoorService{}
 
@@ -61,7 +61,7 @@ func CasdoorJwtMiddleware() gin.HandlerFunc {
 			tokenStr = tokenStr[7:]
 		}
 
-		// 使用 Casdoor SDK 解析验证 Token
+		// 使用站点验签器解析验证 Token
 		claims, err := svc.ParseToken(tokenStr)
 		if err != nil {
 			global.PRISM_LOG.Debug("Casdoor JWT 验证失败",
