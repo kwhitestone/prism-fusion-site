@@ -30,47 +30,65 @@ function checkBuiltinOrg(r) {
  * 避免未登录用户能为任意用户名生成上传链接。
  */
 async function authPresign(r) {
+    r.headersOut['Content-Type'] = 'application/json; charset=utf-8';
+    r.headersOut['Vary'] = 'Origin';
+    var origin = r.headersIn['Origin'] || '';
+    var allowedOrigin = r.variables.presign_allowed_origin || '';
+    var sameOrigin = r.variables.scheme + '://' + r.headersIn['Host'];
+    // Exact configured main-site origin or the account site's own origin only.
+    // Preserve the incoming Origin on the account-check subrequest: Casdoor
+    // must also authorize it. Never clear Origin or substitute a trusted value.
+    if (origin && origin !== allowedOrigin && origin !== sameOrigin) {
+        r.return(403, JSON.stringify({ code: 1, message: 'origin not allowed' }));
+        return;
+    }
+    if (origin) {
+        r.headersOut['Access-Control-Allow-Origin'] = origin;
+        r.headersOut['Access-Control-Allow-Credentials'] = 'true';
+        r.headersOut['Access-Control-Allow-Methods'] = 'GET, OPTIONS';
+        r.headersOut['Access-Control-Allow-Headers'] = 'Content-Type';
+    }
+    if (r.method === 'OPTIONS') {
+        r.return(204);
+        return;
+    }
+    if (r.method !== 'GET') {
+        r.return(405, JSON.stringify({ code: 1, message: 'method not allowed' }));
+        return;
+    }
     try {
-        // 1. 向 Casdoor 校验会话（通过内部 location 禁用 gzip）
-        r.warn('[authPresign] step1: checking auth via /_internal_auth_check');
         let authResp = await r.subrequest('/_internal_auth_check');
-        r.warn('[authPresign] step1 done: status=' + authResp.status + ' bodyLen=' + (authResp.responseText || '').length);
+        r.warn('[authPresign] account check status=' + authResp.status);
+        if (authResp.status === 401 || authResp.status === 403) {
+            r.return(authResp.status, JSON.stringify({ code: 1, message: 'account check denied' }));
+            return;
+        }
+        if (authResp.status !== 200) {
+            r.return(502, JSON.stringify({ code: 1, message: 'account check unavailable' }));
+            return;
+        }
         let authData;
         try {
             authData = JSON.parse(authResp.responseText);
         } catch (e) {
-            r.warn('[authPresign] step1 parse error: ' + e.message + ' body=' + (authResp.responseText || '').substring(0, 200));
-            r.return(502, JSON.stringify({
-                code: 1, message: 'auth check: invalid upstream response'
-            }));
+            r.return(502, JSON.stringify({ code: 1, message: 'invalid account check response' }));
             return;
         }
-
-        if (authData.status !== 'ok') {
-            r.warn('[authPresign] step1 auth failed: status=' + authData.status);
-            r.return(401, JSON.stringify({
-                code: 1, message: 'unauthorized: please sign in first'
-            }));
+        if (authData.status !== 'ok' || !authData.data || !authData.data.name) {
+            r.return(401, JSON.stringify({ code: 1, message: 'unauthorized: please sign in first' }));
             return;
         }
-
-        r.warn('[authPresign] step1 auth ok, user=' + (authData.data && authData.data.name || 'unknown'));
-
-        // 2. 鉴权通过，转发到 storage nginx 获取预签名 URL
-        r.warn('[authPresign] step2: subrequest /_internal_storage_presign args=' + r.variables.args);
-        let presignResp = await r.subrequest('/_internal_storage_presign', {
-            args: r.variables.args
-        });
-        r.warn('[authPresign] step2 done: status=' + presignResp.status + ' body=' + (presignResp.responseText || '').substring(0, 500));
-
-        // 3. 透传 storage 响应
-        r.headersOut['Content-Type'] = 'application/json; charset=utf-8';
+        if (r.args.username !== authData.data.name) {
+            r.return(403, JSON.stringify({ code: 1, message: 'upload owner mismatch' }));
+            return;
+        }
+        let presignResp = await r.subrequest('/_internal_storage_presign', { args: r.variables.args });
+        // A successful response contains a capability URL; log status only.
+        r.warn('[authPresign] storage status=' + presignResp.status);
         r.return(presignResp.status, presignResp.responseText);
     } catch (e) {
-        r.warn('[authPresign] exception: ' + e.message + ' stack=' + (e.stack || ''));
-        r.return(500, JSON.stringify({
-            code: 1, message: 'presign auth error: ' + e.message
-        }));
+        r.warn('[authPresign] subrequest failed');
+        r.return(502, JSON.stringify({ code: 1, message: 'presign upstream error' }));
     }
 }
 

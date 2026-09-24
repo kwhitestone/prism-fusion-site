@@ -31,6 +31,7 @@ server {
 
     # ---- 头像预签名上传（会话鉴权 + 转发到 storage nginx）----
     location = /api/storage/presign {
+        set $presign_allowed_origin '${CORS_ALLOW_ORIGIN}';
         js_content casdoor_filter.authPresign;
     }
     location = /_internal_auth_check {
@@ -40,6 +41,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header Accept-Encoding "";
         proxy_set_header Cookie $http_cookie;
+        proxy_set_header Origin $http_origin;
     }
     location = /_internal_storage_presign {
         internal;
@@ -126,6 +128,7 @@ server {
 
     # 头像预签名（内部管理也需要）
     location = /api/storage/presign {
+        set $presign_allowed_origin '${CORS_ALLOW_ORIGIN}';
         js_content casdoor_filter.authPresign;
     }
     location = /_internal_auth_check {
@@ -135,6 +138,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header Accept-Encoding "";
         proxy_set_header Cookie $http_cookie;
+        proxy_set_header Origin $http_origin;
     }
     location = /_internal_storage_presign {
         internal;

@@ -17,11 +17,17 @@ STORAGE_PRESIGN_UPSTREAM=${STORAGE_PRESIGN_UPSTREAM:-http://rclone-nginx:5001}
 # 选择模板
 if [ "$NGINX_SSL_MODE" = "1" ]; then
     TEMPLATE="/data/default-ssl.conf.template"
-    CORS_ALLOW_ORIGIN=${CORS_ALLOW_ORIGIN:-https://$NGINX_SERVER_NAME}
     echo "Mode: SSL (:5000) + HTTP (:8080)"
 else
     TEMPLATE="/data/default.conf.template"
     echo "Mode: HTTP (:8080) only"
+fi
+
+# A single exact origin supplied by the deployment; no wildcard or config injection.
+# Empty disables cross-origin presign access (same-origin/server clients still work).
+if [ -n "$CORS_ALLOW_ORIGIN" ] && ! printf '%s\n' "$CORS_ALLOW_ORIGIN" | grep -Eq '^https?://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]+)?$'; then
+    echo "Error: CORS_ALLOW_ORIGIN must be one exact http(s) origin without a path"
+    exit 1
 fi
 
 if [ ! -f "$TEMPLATE" ]; then
