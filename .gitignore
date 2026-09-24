@@ -20,3 +20,7 @@ rclone/local-storage/*
 .claude-nd-v2-ref/
 .pfs-split-work/
 .claude-nd-v2-migration-prompt.md
+
+# Persistent application data (keep directory for local runs)
+app/src/server/data/*
+!app/src/server/data/.gitkeep

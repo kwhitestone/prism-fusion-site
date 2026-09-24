@@ -69,7 +69,7 @@ mysql:
 
 # SQLite配置（MySQL未配置时使用）
 sqlite:
-  path: './prism_fusion_site.db'
+  path: './data/prism_fusion_site.db'
   max-idle-conns: 10
   max-open-conns: 100
   log-mode: 'error'
