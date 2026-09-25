@@ -25,6 +25,8 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	casbinMiddleware "top.whitestone/prism-fusion-site/addons/casbin-rbac/middleware"
+	casbinService "top.whitestone/prism-fusion-site/addons/casbin-rbac/service"
 	"top.whitestone/prism-fusion-site/addons/casdoor-auth/conf"
 	"top.whitestone/prism-fusion-site/addons/casdoor-auth/middleware"
 	"top.whitestone/prism-fusion-site/addons/casdoor-auth/model"
@@ -40,6 +42,8 @@ func TestLogoutL2(t *testing.T) {
 	oldConfig, oldDB, oldLog := *conf.Get(), global.PRISM_DB, global.PRISM_LOG
 	t.Cleanup(func() { *conf.Get() = oldConfig; global.PRISM_DB = oldDB; global.PRISM_LOG = oldLog })
 	global.PRISM_LOG = zap.NewNop()
+	casbinService.InvalidatePermCache()
+	t.Cleanup(casbinService.InvalidatePermCache)
 	dbPath := filepath.Join(t.TempDir(), "sessions.db")
 	openDB := func() *gorm.DB {
 		db, err := gorm.Open(sqlite.Open(dbPath+"?_busy_timeout=5000"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
@@ -88,6 +92,8 @@ func TestLogoutL2(t *testing.T) {
 			}
 			a, b := pair(r.Form.Get("code"))
 			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": a, "refresh_token": b, "token_type": "Bearer"})
+		case "/api/get-permissions":
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "data": []any{map[string]any{"users": []string{"test-org/*"}, "resources": []string{"/api/protected"}, "actions": []string{"GET"}, "effect": "Allow", "isEnabled": true}}})
 		case "/api/logout":
 			logoutCalls.Add(1)
 			if r.Form.Get("id_token_hint") == "" {
@@ -104,7 +110,7 @@ func TestLogoutL2(t *testing.T) {
 	svc.InitSDK()
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
-	engine.Use(middleware.CasdoorJwtMiddleware())
+	engine.Use(middleware.CasdoorJwtMiddleware(), casbinMiddleware.CasbinAuthzMiddleware())
 	engine.GET("/api/protected", func(c *gin.Context) { c.Status(200) })
 	router.RegisterRoutes(humagin.New(engine, huma.DefaultConfig("test", "1")))
 	request := func(path, access string, body map[string]string) *httptest.ResponseRecorder {

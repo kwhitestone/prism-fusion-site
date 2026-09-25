@@ -37,9 +37,17 @@ func TestPluginScopeIsolationThroughFrameworkRouter(t *testing.T) {
 		t.Fatal(err)
 	}
 	certificate := string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: publicKey}))
-	// Only read-only local endpoints are allowed; bootstrap must never reach a real Casdoor.
+	// Bootstrap uses read-only local endpoints; logout uses a synthetic local response.
 	casdoor := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/api/logout" && r.Method == http.MethodPost {
+			_ = r.ParseForm()
+			if r.Form.Get("id_token_hint") == "" {
+				t.Error("missing logout hint")
+			}
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+			return
+		}
 		if r.Method != http.MethodGet {
 			t.Errorf("unexpected Casdoor write: %s %s", r.Method, r.URL.Path)
 			http.Error(w, "writes forbidden", http.StatusForbidden)
@@ -153,4 +161,9 @@ func TestPluginScopeIsolationThroughFrameworkRouter(t *testing.T) {
 	request(token, "POST", "/api/v1/addons/messages", `{"content":"allowed","author":"integration-user"}`, http.StatusOK, false)
 	request(token, "DELETE", "/api/v1/addons/messages", "", http.StatusForbidden, false)
 	request(token, "GET", "/api/v1/addons/example-other/items", "", http.StatusNotFound, false)
+	request("invalid-token", "POST", "/api/v1/addons/casdoor-auth/logout", "{}", http.StatusUnauthorized, false)
+	request("", "POST", "/api/v1/addons/casdoor-auth/logout-other", "{}", http.StatusUnauthorized, false)
+	request(token, "POST", "/api/v1/addons/casdoor-auth/logout", "{}", http.StatusOK, false)
+	request(token, "GET", "/api/v1/addons/casdoor-auth/user-info", "", http.StatusUnauthorized, false)
+
 }

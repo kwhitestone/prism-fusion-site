@@ -77,7 +77,7 @@ type CasdoorRefreshInput struct {
 type CasdoorLogoutInput struct {
 	Authorization string `header:"Authorization" required:"true"`
 	Body          struct {
-		RefreshToken string `json:"refreshToken" maxLength:"16384"`
+		RefreshToken string `json:"refreshToken,omitempty" maxLength:"16384"`
 	}
 }
 type CasdoorLogoutOutput struct {

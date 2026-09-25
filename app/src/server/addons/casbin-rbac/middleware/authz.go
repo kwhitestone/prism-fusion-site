@@ -48,6 +48,13 @@ func CasbinAuthzMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		// Self-service revocation validates signed credentials and family ownership
+		// in its handler, including already expired/revoked access credentials.
+		if path == "/api/v1/addons/casdoor-auth/logout" && method == http.MethodPost {
+			c.Next()
+			return
+		}
+
 		// 跳过白名单路径
 		for _, p := range skipPaths {
 			if path == p || strings.HasPrefix(path, p) {
