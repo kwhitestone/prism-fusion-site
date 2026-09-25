@@ -39,7 +39,7 @@ func TestCasdoorContractAndFrozenActivation(t *testing.T) {
 	if err != nil || len(resolved) != 1 || len(candidate.GlobalMiddlewares()) != 1 {
 		t.Fatalf("activation changed after freeze: %v, %v", resolved, err)
 	}
-	if len(candidate.Models()) != 0 || candidate.Priority() != 10 {
+	if len(candidate.Models()) != 2 || candidate.Priority() != 10 {
 		t.Fatal("unexpected model or priority contract")
 	}
 }

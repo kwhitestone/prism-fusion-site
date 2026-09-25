@@ -37,6 +37,11 @@ func verificationKey(certificate string) (*rsa.PublicKey, error) {
 }
 
 func verifyCasdoorToken(raw string, cfg *conf.CasdoorConfig) (*casdoorsdk.Claims, error) {
+	return verifyCasdoorCredential(raw, cfg, false, false)
+}
+
+// allowExpired is used only to revoke credentials, never to authenticate requests.
+func verifyCasdoorCredential(raw string, cfg *conf.CasdoorConfig, refresh, allowExpired bool) (*casdoorsdk.Claims, error) {
 	key, err := verificationKey(cfg.Certificate)
 	if err != nil {
 		return nil, err
@@ -45,13 +50,26 @@ func verifyCasdoorToken(raw string, cfg *conf.CasdoorConfig) (*casdoorsdk.Claims
 		return nil, errors.New("incomplete Casdoor verification configuration")
 	}
 	claims := jwt.MapClaims{}
+	options := []jwt.ParserOption{jwt.WithValidMethods([]string{"RS256"}), jwt.WithExpirationRequired(), jwt.WithAudience(cfg.ClientID), jwt.WithJSONNumber()}
+	if allowExpired {
+		options = append(options, jwt.WithoutClaimsValidation())
+	}
 	token, err := jwt.ParseWithClaims(raw, claims, func(*jwt.Token) (interface{}, error) {
 		return key, nil
-	}, jwt.WithValidMethods([]string{"RS256"}), jwt.WithExpirationRequired(),
-		jwt.WithAudience(cfg.ClientID), jwt.WithJSONNumber())
+	}, options...)
 	if err != nil || token == nil || !token.Valid {
 		// Parser errors can contain attacker-controlled claim/header values.
 		return nil, errors.New("invalid Casdoor token signature or claims")
+	}
+	// Even the revocation-only path must validate audience and require a real exp.
+	audience, audienceErr := claims.GetAudience()
+	validAudience := false
+	for _, value := range audience {
+		validAudience = validAudience || value == cfg.ClientID
+	}
+	expiry, expiryErr := claims.GetExpirationTime()
+	if audienceErr != nil || !validAudience || expiryErr != nil || expiry == nil {
+		return nil, errors.New("invalid Casdoor credential audience or expiry")
 	}
 	// Casdoor generateJwtToken uses getOriginFromHost, not an organization URL.
 	// Both origins are trusted configuration (internal code exchange / public login).
@@ -66,8 +84,9 @@ func verifyCasdoorToken(raw string, cfg *conf.CasdoorConfig) (*casdoorsdk.Claims
 	if subject, err := claims.GetSubject(); err != nil || subject == "" {
 		return nil, errors.New("missing Casdoor token subject")
 	}
-	if claims["tokenType"] == "refresh-token" || claims["TokenType"] == "refresh-token" {
-		return nil, errors.New("refresh token cannot authenticate requests")
+	isRefresh := claims["tokenType"] == "refresh-token" || claims["TokenType"] == "refresh-token"
+	if isRefresh != refresh {
+		return nil, errors.New("invalid Casdoor credential type")
 	}
 
 	// Only map claims after validating the ORIGINAL compact JWT. Shadow the SDK's

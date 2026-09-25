@@ -6,12 +6,16 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+	"top.whitestone/prism-fusion-site/addons/casdoor-auth/model"
 
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
 	"github.com/danielgtaylor/huma/v2"
@@ -40,6 +44,16 @@ func TestDualClaimsAuthentication(t *testing.T) {
 	oldConfig, oldLog := *conf.Get(), global.PRISM_LOG
 	t.Cleanup(func() { *conf.Get() = oldConfig; global.PRISM_LOG = oldLog })
 	global.PRISM_LOG = zap.NewNop()
+	oldDB := global.PRISM_DB
+	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "auth.db")), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&model.CasdoorSession{}, &model.CasdoorTokenBlacklist{}); err != nil {
+		t.Fatal(err)
+	}
+	global.PRISM_DB = db
+	t.Cleanup(func() { global.PRISM_DB = oldDB; sqlDB, _ := db.DB(); _ = sqlDB.Close() })
 	tokens := map[string]string{}
 	jwksCalls := 0
 	var upstream *httptest.Server
@@ -56,7 +70,12 @@ func TestDualClaimsAuthentication(t *testing.T) {
 			}}})
 		case "/api/login/oauth/access_token":
 			_ = r.ParseForm()
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"access_token": tokens[r.Form.Get("code")], "refresh_token": "synthetic-refresh", "token_type": "Bearer"})
+			access := tokens[r.Form.Get("code")]
+			rc := jwt.MapClaims{}
+			_, _, _ = jwt.NewParser().ParseUnverified(access, rc)
+			rc["tokenType"] = "refresh-token"
+			refresh, _ := jwt.NewWithClaims(jwt.SigningMethodRS256, rc).SignedString(key)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"access_token": access, "refresh_token": refresh, "token_type": "Bearer"})
 		case "/api/get-user":
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok", "data": map[string]interface{}{"name": "tester", "owner": "test-org", "id": "test-user"}})
 		default:
@@ -133,19 +152,12 @@ func TestDualClaimsAuthentication(t *testing.T) {
 				token = strings.Join(parts, ".")
 			}
 			tokens[tc.name] = token
-			req := httptest.NewRequest("GET", "/api/protected", nil)
-			req.Header.Set("Authorization", "Bearer "+token)
-			w := httptest.NewRecorder()
-			engine.ServeHTTP(w, req)
-			if w.Code != tc.want {
-				t.Fatalf("middleware status %d, want %d", w.Code, tc.want)
-			}
 			// PKCE path obtains a verifier using the production signin URL method.
 			_ = svc.GetSigninURL(tc.name, redirect)
 			body, _ := json.Marshal(map[string]string{"code": tc.name, "state": tc.name, "redirectUri": redirect})
-			req = httptest.NewRequest("POST", "/api/v1/addons/casdoor-auth/signin-callback", bytes.NewReader(body))
+			req := httptest.NewRequest("POST", "/api/v1/addons/casdoor-auth/signin-callback", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
-			w = httptest.NewRecorder()
+			w := httptest.NewRecorder()
 			engine.ServeHTTP(w, req)
 			if w.Code != tc.want {
 				t.Fatalf("PKCE callback status %d, want %d", w.Code, tc.want)
@@ -157,6 +169,13 @@ func TestDualClaimsAuthentication(t *testing.T) {
 			engine.ServeHTTP(w, req)
 			if w.Code != tc.want {
 				t.Fatalf("SDK callback status %d, want %d", w.Code, tc.want)
+			}
+			req = httptest.NewRequest("GET", "/api/protected", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			w = httptest.NewRecorder()
+			engine.ServeHTTP(w, req)
+			if w.Code != tc.want {
+				t.Fatalf("middleware status %d, want %d", w.Code, tc.want)
 			}
 			if tc.want == 401 && strings.Contains(w.Body.String(), token) {
 				t.Fatal("token leaked in error")

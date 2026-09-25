@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/kwhitestone/prism-fusion/global"
 	"top.whitestone/prism-fusion-site/addons/casdoor-auth/conf"
@@ -70,6 +71,19 @@ type SigninCallbackInput struct {
 type CasdoorRefreshInput struct {
 	Body struct {
 		RefreshToken string `json:"refreshToken" required:"true" doc:"刷新令牌"`
+	}
+}
+
+type CasdoorLogoutInput struct {
+	Authorization string `header:"Authorization" required:"true"`
+	Body          struct {
+		RefreshToken string `json:"refreshToken" maxLength:"16384"`
+	}
+}
+type CasdoorLogoutOutput struct {
+	Body struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
 	}
 }
 
@@ -210,6 +224,19 @@ func RegisterRoutes(api huma.API) {
 		}
 		return resp, nil
 	})
+
+	huma.Register(api, huma.Operation{OperationID: "casdoorLogout", Method: http.MethodPost,
+		Path: "/api/v1/addons/casdoor-auth/logout", Summary: "撤销 Casdoor 会话", Tags: []string{"Casdoor Auth"}},
+		func(ctx context.Context, input *CasdoorLogoutInput) (*CasdoorLogoutOutput, error) {
+			access := strings.TrimPrefix(input.Authorization, "Bearer ")
+			if err := casdoorSvc.Logout(ctx, access, input.Body.RefreshToken); err != nil {
+				// Return a generic response; database/IdP errors must not disclose credentials.
+				return nil, huma.NewError(http.StatusUnauthorized, "会话注销失败")
+			}
+			resp := &CasdoorLogoutOutput{}
+			resp.Body.Message = "会话已注销"
+			return resp, nil
+		})
 
 	// 刷新 Token
 	huma.Register(api, huma.Operation{

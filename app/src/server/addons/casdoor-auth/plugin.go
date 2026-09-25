@@ -1,10 +1,14 @@
 package casdoorauth
 
 import (
+	"time"
+
 	"github.com/kwhitestone/prism-fusion/global"
 	"github.com/kwhitestone/prism-fusion/plugin"
+	"gorm.io/gorm"
 	"top.whitestone/prism-fusion-site/addons/casdoor-auth/conf"
 	casdoorMiddleware "top.whitestone/prism-fusion-site/addons/casdoor-auth/middleware"
+	"top.whitestone/prism-fusion-site/addons/casdoor-auth/model"
 	casdoorRouter "top.whitestone/prism-fusion-site/addons/casdoor-auth/router"
 	"top.whitestone/prism-fusion-site/addons/casdoor-auth/service"
 
@@ -81,12 +85,15 @@ func (p *CasdoorAuthPlugin) RegisterRoutes(api huma.API) {
 }
 
 func (p *CasdoorAuthPlugin) Models() []interface{} {
-	// Casdoor 管理用户，本地不需要 User 模型
-	return nil
+	return []interface{}{&model.CasdoorSession{}, &model.CasdoorTokenBlacklist{}}
 }
 
 func (p *CasdoorAuthPlugin) GlobalMiddlewares() []gin.HandlerFunc {
 	return []gin.HandlerFunc{
 		casdoorMiddleware.CasdoorJwtMiddleware(),
 	}
+}
+
+func (p *CasdoorAuthPlugin) AfterMigrate(db *gorm.DB) error {
+	return service.CleanupSessions(db, time.Now())
 }

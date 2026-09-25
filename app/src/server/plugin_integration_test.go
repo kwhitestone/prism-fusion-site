@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -22,6 +24,7 @@ import (
 	"go.uber.org/zap"
 	casbinservice "top.whitestone/prism-fusion-site/addons/casbin-rbac/service"
 	"top.whitestone/prism-fusion-site/addons/casdoor-auth/conf"
+	"top.whitestone/prism-fusion-site/addons/casdoor-auth/model"
 )
 
 func TestPluginScopeIsolationThroughFrameworkRouter(t *testing.T) {
@@ -131,6 +134,15 @@ func TestPluginScopeIsolationThroughFrameworkRouter(t *testing.T) {
 	}
 	if _, err := casdoorsdk.ParseJwtToken(token); err != nil {
 		t.Fatalf("fixture must pass real SDK verification: %v", err)
+	}
+	// Authentication requires a local family, even for a correctly signed JWT.
+	request(token, "GET", "/api/v1/addons/example/items", "", http.StatusUnauthorized, false)
+	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(token)))
+	if err := global.PRISM_DB.Create(&model.CasdoorSession{
+		TokenHash: hash, FamilyID: "scope-test", Subject: claims.Subject, AccessKey: hash,
+		AccessExpiresAt: claims.ExpiresAt.Time, ExpiresAt: claims.ExpiresAt.Time, FamilyExpiresAt: claims.ExpiresAt.Time,
+	}).Error; err != nil {
+		t.Fatal(err)
 	}
 	request(token, "GET", "/api/v1/addons/example/items", "", http.StatusOK, true)
 	request(token, "GET", "/api/v1/addons/site-info/info", "", http.StatusOK, false)

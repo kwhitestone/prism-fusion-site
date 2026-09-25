@@ -38,6 +38,12 @@ func CasdoorJwtMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		// Logout validates signed credentials itself, including expired/revoked ones.
+		if path == "/api/v1/addons/casdoor-auth/logout" {
+			c.Next()
+			return
+		}
+
 		// 白名单路径放行
 		for _, p := range publicPaths {
 			if path == p || strings.HasPrefix(path, p) {

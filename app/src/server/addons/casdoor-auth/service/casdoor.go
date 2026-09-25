@@ -521,8 +521,15 @@ func (s *CasdoorService) ExchangeToken(code string, state string, redirectUri st
 		return nil, "", "", errors.New("no PKCE verifier and no client_secret configured, cannot exchange token")
 	}
 
-	claims, err := s.ParseToken(accessToken)
+	claims, err := verifyCasdoorToken(accessToken, conf.Get())
 	if err != nil {
+		return nil, "", "", err
+	}
+
+	if refreshToken == "" {
+		refreshToken = accessToken
+	}
+	if err := s.registerSession(accessToken, refreshToken); err != nil {
 		return nil, "", "", err
 	}
 
@@ -594,16 +601,19 @@ func exchangeTokenWithPKCE(endpoint, clientID, code, redirectURI, codeVerifier s
 
 // ParseToken 解析验证 Casdoor JWT（用于中间件验证请求中的 token）
 func (s *CasdoorService) ParseToken(accessToken string) (*casdoorsdk.Claims, error) {
-	return verifyCasdoorToken(accessToken, conf.Get())
+	claims, err := verifyCasdoorToken(accessToken, conf.Get())
+	if err != nil {
+		return nil, err
+	}
+	if err := checkSessionActive(global.PRISM_DB, accessToken, claims); err != nil {
+		return nil, err
+	}
+	return claims, nil
 }
 
 // RefreshToken 刷新 Casdoor Token
 func (s *CasdoorService) RefreshToken(refreshToken string) (string, string, error) {
-	newToken, err := casdoorsdk.RefreshOAuthToken(refreshToken)
-	if err != nil {
-		return "", "", fmt.Errorf("refresh token failed: %w", err)
-	}
-	return newToken.AccessToken, newToken.RefreshToken, nil
+	return s.refreshSession(refreshToken)
 }
 
 // GetTokenExpireSeconds 返回 Access Token 的过期时间（秒），前端用于设置 expires
